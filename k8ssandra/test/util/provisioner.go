@@ -27,10 +27,8 @@ import (
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/framework"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/stretchr/testify/require"
-	"k8s.io/utils/strings/slices"
 	"log"
 	"path"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -50,8 +48,6 @@ func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) model.Pro
 	})
 
 	ts.RunTestStage(t, "provisioning", func() {
-
-		logger.Log(t, "provisioning started")
 		provConfig := config.ProvisionConfig
 		tfConfig := provConfig.TFConfig
 		tfModulesFolder := ts.CopyTerraformFolderToTemp(t, "../..", tfConfig.ModuleFolder)
@@ -71,51 +67,11 @@ func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) model.Pro
 	return result
 }
 
-func InstallK8ssandra(t *testing.T, config model.ReadinessConfig, serviceAccount string) {
-	require.NotEmpty(t, serviceAccount, "installation of k8ssandra requires "+
-		"that service account is existing.")
-
-	logger.Log(t, "install started for k8ssandra")
-	provConfig := config.ProvisionConfig
-	k8cConfig := provConfig.K8cConfig
-	options := createKubeConfigs(t, config)
-
-	logger.Log(t, "e2e framework integration from k8ssandra-operator")
-	e2eFramework, err := framework.NewE2eFramework(t, config.Contexts, options)
-	require.NoError(t, err)
-	require.NotNil(t, e2eFramework)
-
-	// Install k8ssandra-operator(s) and k8ssandra-cluster
-	for name, ctx := range config.Contexts {
-		isControlPlane := slices.Contains(ctx.ClusterLabels, "control-plane")
-		helmOptions := createHelmOptions(t, options[name])
-
-		repoSetup(t, helmOptions)
-		installK8ssandraOperator(t, name, ctx.Namespace, helmOptions,
-			k8cConfig.ClusterScoped, isControlPlane)
-
-		if isControlPlane {
-			logger.Log(t, fmt.Sprintf("deploying k8ssandra-cluster "+
-				"for context: [%s] namespace: [%s]", ctx.Name, ctx.Namespace))
-			deployK8ssandraCluster(t, config, options[name])
-		}
-	}
-
-	controlPlaneContext := e2eFramework.ControlPlaneContext
-
-	logger.Log(t, fmt.Sprintf("control plane identified as: %s", controlPlaneContext))
-	verifyControlPlane(t, controlPlaneContext)
-	fetchServiceAccountConfig(t, options, controlPlaneContext, serviceAccount)
-
-}
-
 func createHelmOptions(t *testing.T, options *k8s.KubectlOptions) *helm.Options {
-
 	helmOptions := &helm.Options{
 		KubectlOptions: options,
 	}
 	return helmOptions
-
 }
 
 func fetchServiceAccountConfig(t *testing.T, options map[string]*k8s.KubectlOptions, controlPlaneContext string,
@@ -132,7 +88,6 @@ func fetchServiceAccountConfig(t *testing.T, options map[string]*k8s.KubectlOpti
 	certificate := fetchCertificate(t, options[controlPlaneContext], controlPlaneContext, serviceAccountSecret)
 	logger.Log(t, fmt.Sprintf("service account [cert] obtained: %s", certificate))
 
-	// TODO return the service account configuration
 	return model.ServiceAccountConfig{}
 }
 
@@ -187,36 +142,6 @@ func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, options 
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	logger.Log(t, out)
-}
-
-/**
-Create the k8ssandra-operator namespace if necessary
-Install cass-operator in the k8ssandra-operator namespace
-Install K8ssandra-Operator in the k8ssandra-operator namespace OR in the context namespace depending on scope
-The cluster scoping is required for clusters that run locally like kind.
-*/
-func installK8ssandraOperator(t *testing.T, contextName string, namespace string,
-	helmOptions *helm.Options, isClusterScoped bool, isControlPlane bool) {
-
-	logger.Log(t, fmt.Sprintf("cluster scoped for k8ssandra-operator is set as: %s",
-		strconv.FormatBool(isClusterScoped)))
-	logger.Log(t, fmt.Sprintf("installing [k8ssandra-operator] "+
-		"for context: [%s] and namespace: [%s]", contextName, namespace))
-
-	var ns = namespace
-	if isClusterScoped {
-		ns = defaultK8ssandraOperatorReleaseName
-	}
-
-	result, err := helm.RunHelmCommandAndGetOutputE(t, helmOptions,
-		"install", defaultK8ssandraOperatorReleaseName, defaultK8ssandraOperatorChart, "-n", ns,
-		"--create-namespace", "--set controlPlane=", strconv.FormatBool(isControlPlane))
-
-	if err != nil {
-		logger.Log(t, fmt.Sprintf("failed k8ssandra install due to error: %s", err.Error()))
-	} else {
-		logger.Log(t, fmt.Sprintf("installation result: %s", result))
-	}
 }
 
 func Cleanup(t *testing.T, options *terraform.Options, testModulesPath string, kubectlConfigPath string) {
@@ -298,7 +223,6 @@ func createNamespace(t *testing.T, kubectlOptions *k8s.KubectlOptions, namespace
 }
 
 func restartControlPlaneOperator(t *testing.T, options *k8s.KubectlOptions, config model.ReadinessConfig) {
-
 	// TODO
 	// kubectl -n k8ssandra-operator rollout restart deployment k8ssandra-operator-k8ssandra-operator
 	//k8cConfig := config.ProvisionConfig.K8cConfig
