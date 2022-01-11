@@ -10,6 +10,32 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*_key
+example.tf
+terraform.tfplan
+terraform.tfstate
+bin/
+dist/
+modules-dev/
+/pkg/
+website/.vagrant
+website/.bundle
+website/build
+website/node_modules
+.vagrant/
+*.backup
+./*.tfstate
+.terraform/
+*.log
+*.bak
+*~
+.*.swp
+.idea
+*.iml
+.terraform.lock.hcl
+.vscode
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+website/vendor
+
+# Keep windows files with windows line endings
+*.winfile eol=crlf
