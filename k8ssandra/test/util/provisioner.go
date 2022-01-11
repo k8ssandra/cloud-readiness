@@ -37,7 +37,6 @@ import (
 
 const (
 	defaultTestSubFolder                = "env"
-	defaultK8ssandraReleaseName         = "k8ssandra"
 	defaultK8ssandraOperatorReleaseName = "k8ssandra-operator"
 	defaultK8ssandraOperatorChart       = "k8ssandra/k8ssandra-operator"
 )
@@ -77,12 +76,8 @@ func InstallK8ssandra(t *testing.T, config model.ReadinessConfig, serviceAccount
 		"that service account is existing.")
 
 	logger.Log(t, "install started for k8ssandra")
-	// provConfig := config.ProvisionConfig
-	// k8cConfig := provConfig.K8cConfig
-	// releaseName := fmt.Sprintf("k8ssandra-%s", config.UniqueId)
-	// helmConfig := provConfig.HelmConfig
-	// repoSetup(t, helmOptions)
-
+	provConfig := config.ProvisionConfig
+	k8cConfig := provConfig.K8cConfig
 	options := createKubeConfigs(t, config)
 
 	logger.Log(t, "e2e framework integration from k8ssandra-operator")
@@ -93,18 +88,16 @@ func InstallK8ssandra(t *testing.T, config model.ReadinessConfig, serviceAccount
 	// Install k8ssandra-operator(s) and k8ssandra-cluster
 	for name, ctx := range config.Contexts {
 		isControlPlane := slices.Contains(ctx.ClusterLabels, "control-plane")
-		helmOptions := &helm.Options{
-			KubectlOptions: options[name],
-		}
-		require.NotNil(t, helmOptions)
+		helmOptions := createHelmOptions(t, options[name])
 
-		// installK8ssandraOperator(t, name, ctx.Namespace, helmOptions,
-		//	   k8cConfig.ClusterScoped, isControlPlane)
+		repoSetup(t, helmOptions)
+		installK8ssandraOperator(t, name, ctx.Namespace, helmOptions,
+			k8cConfig.ClusterScoped, isControlPlane)
 
 		if isControlPlane {
 			logger.Log(t, fmt.Sprintf("deploying k8ssandra-cluster "+
 				"for context: [%s] namespace: [%s]", ctx.Name, ctx.Namespace))
-			// deployK8ssandraCluster(t, config, options[name])
+			deployK8ssandraCluster(t, config, options[name])
 		}
 	}
 
@@ -112,8 +105,16 @@ func InstallK8ssandra(t *testing.T, config model.ReadinessConfig, serviceAccount
 
 	logger.Log(t, fmt.Sprintf("control plane identified as: %s", controlPlaneContext))
 	verifyControlPlane(t, controlPlaneContext)
-
 	fetchServiceAccountConfig(t, options, controlPlaneContext, serviceAccount)
+
+}
+
+func createHelmOptions(t *testing.T, options *k8s.KubectlOptions) *helm.Options {
+
+	helmOptions := &helm.Options{
+		KubectlOptions: options,
+	}
+	return helmOptions
 
 }
 
