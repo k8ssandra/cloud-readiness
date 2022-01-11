@@ -14,7 +14,7 @@ cleaned up based on the verification scenario defined. All of these activities w
 It was important that the cloud-readiness framework could be referenced locally in a Linux machine or as part of CI/CD pipeline.  The diagram below describes the framework's flexibilty of running
  on a user's local Linux or deployed to a centralized test environment.
 
-[![cloud-readiness-overview](https://github.com/k8ssandra/cloud-readiness/blob/main/docs/images/cloud-readiness-overview.svg)]
+![cloud-readiness-overview](https://github.com/k8ssandra/cloud-readiness/blob/main/docs/images/cloud-readiness-overview.svg)
 
 
 
