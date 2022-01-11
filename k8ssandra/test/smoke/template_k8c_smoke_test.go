@@ -24,16 +24,16 @@ import (
 	"testing"
 )
 
-func TestBasicSmoke1(t *testing.T) {
+func TestGoogleTemplate(t *testing.T) {
 
 	cloudConfig := CloudConfig{
-		Name:        "bootz4",
-		Project:     "community-ecosystem",
+		Name:        "<UNIQUE-NAME>",
+		CredPath:    "<YOUR-HOME-DIR>/.config/gcloud/application_default_credentials.json",
+		Project:     "<YOUR-PROJ-NAME>",
 		Region:      "us-central1",
 		Location:    "us-central1-a",
 		Environment: "dev",
 		MachineType: "n2-highmem-8",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
 		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
 		Bucket:      "google_storage_bucket",
 	}
@@ -43,7 +43,7 @@ func TestBasicSmoke1(t *testing.T) {
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
 		ValuesFilePath:          "k8ssandra-clusters.yaml",
-		ClusterScoped:			 true,
+		ClusterScoped:           true,
 	}
 
 	tfConfig := TFConfig{
@@ -56,7 +56,7 @@ func TestBasicSmoke1(t *testing.T) {
 
 	provisionConfig := ProvisionConfig{
 		CleanOnly:          false,
-		CleanDir:           "/tmp/TestBasicSmoke11567231187/k8ssandra/provision/gcp/env",
+		CleanDir:           "<ONLY IF CLEAN-ONLY SET TO TRUE>",
 		PreTestCleanup:     false,
 		PostTestCleanup:    false,
 		TFConfig:           tfConfig,
@@ -68,30 +68,30 @@ func TestBasicSmoke1(t *testing.T) {
 		DefaultTimeoutSecs: 240,
 	}
 
+	// TODO - still some work here to coordinate with provision step.
 	ctxConfig1 := ContextConfig{
-		Name:          "gke_community-ecosystem_us-central1_dev-bootz10",
-		Namespace:     "bootz",
+		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz11",
+		Namespace:     "<YOUR-NS>",
 		ClusterLabels: []string{"control-plane"},
 	}
 
 	ctxConfig2 := ContextConfig{
-		Name:          "gke_community-ecosystem_us-central1_dev-bootz11",
-		Namespace:     "bootz",
+		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz12",
+		Namespace:     "<YOUR-NS>",
 		ClusterLabels: []string{"data-plane"},
 	}
 
 	ctxConfig3 := ContextConfig{
-		Name:          "gke_community-ecosystem_us-central1_dev-bootz12",
-		Namespace:     "bootz",
+		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz13",
+		Namespace:     "<YOUR-NS>",
 		ClusterLabels: []string{"data-plane"},
 	}
-
 
 	contexts := map[string]ContextConfig{ctxConfig1.Name: ctxConfig1, ctxConfig2.Name: ctxConfig2, ctxConfig3.Name: ctxConfig3}
 
 	k8cReadinessConfig := ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
-		ClusterNamePrefix:        "dev-bootz",
+		ClusterNamePrefix:        "<CLUSTER-PREFIX> EX=dev-bootz",
 		Contexts:                 contexts,
 		ServiceAccountNamePrefix: "sa",
 		// Expected nodes per zone
@@ -100,6 +100,4 @@ func TestBasicSmoke1(t *testing.T) {
 	}
 
 	ProvisionMultiCluster(t, k8cReadinessConfig)
-	//serviceAccount := "k8ssandra-operator"
-	//InstallK8ssandra(t, k8cReadinessConfig, serviceAccount)
 }
