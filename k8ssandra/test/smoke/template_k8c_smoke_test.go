@@ -68,7 +68,6 @@ func TestGoogleTemplate(t *testing.T) {
 		DefaultTimeoutSecs: 240,
 	}
 
-	// TODO - still some work here to coordinate with provision step.
 	ctxConfig1 := ContextConfig{
 		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz11",
 		Namespace:     "<YOUR-NS>",
@@ -91,7 +90,6 @@ func TestGoogleTemplate(t *testing.T) {
 
 	k8cReadinessConfig := ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
-		ClusterNamePrefix:        "<CLUSTER-PREFIX> EX=dev-bootz",
 		Contexts:                 contexts,
 		ServiceAccountNamePrefix: "sa",
 		// Expected nodes per zone

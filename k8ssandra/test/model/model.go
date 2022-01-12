@@ -73,7 +73,6 @@ type ReadinessConfig struct {
 	KubectlConfigPath        string
 	UniqueId                 string
 	RootFolder               string
-	ClusterNamePrefix        string
 	Contexts                 map[string]ContextConfig
 	ServiceAccountNamePrefix string
 	ExpectedNodeCount        int

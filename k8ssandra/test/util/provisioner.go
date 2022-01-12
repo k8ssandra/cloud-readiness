@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"log"
 	"path"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -39,32 +40,49 @@ const (
 	defaultK8ssandraOperatorChart       = "k8ssandra/k8ssandra-operator"
 )
 
-func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) model.ProvisionResult {
+func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) {
 
-	var result model.ProvisionResult
+	provConfig := config.ProvisionConfig
+	tfConfig := provConfig.TFConfig
 
-	ts.RunTestStage(t, "cloud-specific prep", func() {
-		// gcp.DeleteStorageBucket()
-	})
-
-	ts.RunTestStage(t, "provisioning", func() {
-		provConfig := config.ProvisionConfig
-		tfConfig := provConfig.TFConfig
+	for name, ctx := range config.Contexts {
 		tfModulesFolder := ts.CopyTerraformFolderToTemp(t, "../..", tfConfig.ModuleFolder)
-		logger.Log(t, fmt.Sprintf("testing modules %s", tfModulesFolder))
-
 		kubeConfigPath := k8s.CopyHomeKubeConfigToTemp(t)
-		for name, info := range config.Contexts {
-			kubeOptions := k8s.NewKubectlOptions(name, kubeConfigPath, info.Namespace)
-			tfOptions := CreateOptions(t, config, path.Join(tfModulesFolder, defaultTestSubFolder), kubeConfigPath)
-			if provConfig.CleanOnly {
-				clean(t, tfOptions, kubeOptions, tfModulesFolder, config)
-			} else {
-				apply(t, tfOptions, kubeOptions, tfModulesFolder, config)
-			}
+		tfOptions := CreateOptions(t, config, path.Join(tfModulesFolder, defaultTestSubFolder), kubeConfigPath)
+
+		provisionCluster(t, name, ctx, kubeConfigPath, tfOptions, config, tfModulesFolder)
+	}
+}
+
+// provisionCluster
+func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, kubeConfigPath string,
+	tfOptions map[string]*terraform.Options, config model.ReadinessConfig, tfModulesFolder string) {
+
+	provConfig := config.ProvisionConfig
+	kubeOptions := k8s.NewKubectlOptions(name, kubeConfigPath, ctx.Namespace)
+
+	provisionSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
+		t.Parallel()
+		if provConfig.CleanOnly {
+			clean(t, tfOptions[name], kubeOptions, tfModulesFolder, config)
+		} else {
+			apply(t, tfOptions[name], kubeOptions, tfModulesFolder, config)
 		}
 	})
-	return result
+	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
+}
+
+// nodeChecks for specific context
+func nodeChecks(t *testing.T, name string, options *k8s.KubectlOptions, config model.ReadinessConfig) {
+
+	provConfig := config.ProvisionConfig
+	checkNodesSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
+		t.Parallel()
+		CheckNodesReady(t, options, config.ExpectedNodeCount,
+			provConfig.DefaultRetries, time.Duration(provConfig.DefaultSleepSecs))
+	})
+	logger.Log(t, fmt.Sprintf("CheckNodesReady name:%s result: %s", name,
+		strconv.FormatBool(checkNodesSuccess)))
 }
 
 func createHelmOptions(t *testing.T, options *k8s.KubectlOptions) *helm.Options {
@@ -186,7 +204,6 @@ func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.Kubectl
 	terraform.Init(t, options)
 
 	Cleanup(t, options, testingModules, kubectlOptions.ConfigPath)
-
 	CheckNodesReady(t, kubectlOptions, 0,
 		provConfig.DefaultRetries, time.Duration(provConfig.DefaultSleepSecs))
 }
@@ -195,20 +212,15 @@ func apply(t *testing.T, options *terraform.Options, kubectlOptions *k8s.Kubectl
 	config model.ReadinessConfig) {
 
 	provConfig := config.ProvisionConfig
+
 	terraform.InitAndApply(t, options)
+
 	if provConfig.PreTestCleanup {
 		Cleanup(t, options, tfModulesFolder, kubectlOptions.ConfigPath)
 	}
 	if provConfig.PostTestCleanup {
 		defer Cleanup(t, options, tfModulesFolder, kubectlOptions.ConfigPath)
 	}
-	CheckNodesReady(t, kubectlOptions, config.ExpectedNodeCount,
-		provConfig.DefaultRetries, time.Duration(provConfig.DefaultSleepSecs))
-}
-
-// uniqueTestName consistency with naming for test
-func uniqueTestName(config model.ReadinessConfig) string {
-	return config.UniqueId + "_" + config.ProvisionConfig.CloudConfig.Name
 }
 
 func verifyResourceDescriptors(t *testing.T, config model.ReadinessConfig) {

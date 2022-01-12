@@ -42,42 +42,48 @@ func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber i
 
 // CreateOptions constructs Terraform options, which include kubeConfig path.
 // Names for cluster, service account, and buckets are made to be specific based on the ID provided.
-func CreateOptions(t *testing.T, config model.ReadinessConfig, rootFolder string, kubeConfigPath string) *terraform.Options {
+func CreateOptions(t *testing.T, config model.ReadinessConfig, rootFolder string, kubeConfigPath string) map[string]*terraform.Options {
+
 	provConfig := config.ProvisionConfig
 	cloudConfig := provConfig.CloudConfig
+	var tfOptions = map[string]*terraform.Options{}
 
-	uniqueClusterName := strings.ToLower(fmt.Sprintf(config.ClusterNamePrefix+"-%s", config.UniqueId))
-	uniqueServiceAccountName := strings.ToLower(fmt.Sprintf(config.ServiceAccountNamePrefix+"-%s", config.UniqueId))
-	uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
+	for name, _ := range config.Contexts {
+		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
 
-	vars := map[string]interface{}{
-		"project_id":              cloudConfig.Project,
-		"name":                    cloudConfig.Name,
-		"environment":             cloudConfig.Environment,
-		"location":                cloudConfig.Location,
-		"region":                  cloudConfig.Region,
-		"zone":                    cloudConfig.Region,
-		"kubectl_config_path":     kubeConfigPath,
-		"initial_node_count":      config.ExpectedNodeCount,
-		"cluster_name":            uniqueClusterName,
-		"service_account":         uniqueServiceAccountName,
-		"enable_private_endpoint": false,
-		"enable_private_nodes":    false,
-		"master_ipv4_cidr_block":  "10.0.0.0/28",
-		"machine_type":            cloudConfig.MachineType,
-		"bucket_policy_only":      true,
-		"role":                    "roles/storage.admin",
-		cloudConfig.Bucket:        uniqueBucketName,
+		uniqueServiceAccountName := strings.ToLower(fmt.Sprintf(config.ServiceAccountNamePrefix+"-%s", config.UniqueId))
+		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
+
+		vars := map[string]interface{}{
+			"project_id":              cloudConfig.Project,
+			"name":                    uniqueClusterName,
+			"environment":             cloudConfig.Environment,
+			"location":                cloudConfig.Location,
+			"region":                  cloudConfig.Region,
+			"zone":                    cloudConfig.Region,
+			"kubectl_config_path":     kubeConfigPath,
+			"initial_node_count":      config.ExpectedNodeCount,
+			"cluster_name":            uniqueClusterName,
+			"service_account":         uniqueServiceAccountName,
+			"enable_private_endpoint": false,
+			"enable_private_nodes":    false,
+			"master_ipv4_cidr_block":  "10.0.0.0/28",
+			"machine_type":            cloudConfig.MachineType,
+			"bucket_policy_only":      true,
+			"role":                    "roles/storage.admin",
+			cloudConfig.Bucket:        uniqueBucketName,
+		}
+
+		envVars := map[string]string{cloudConfig.CredKey: cloudConfig.CredPath}
+
+		options := terraform.Options{
+			TerraformDir: rootFolder,
+			Vars:         vars,
+			EnvVars:      envVars,
+		}
+		tfOptions[name] = &options
 	}
-
-	envVars := map[string]string{cloudConfig.CredKey: cloudConfig.CredPath}
-
-	options := terraform.Options{
-		TerraformDir: rootFolder,
-		Vars:         vars,
-		EnvVars:      envVars,
-	}
-	return &options
+	return tfOptions
 }
 
 // checkForAllNodes determines if expected number of nodes exist
