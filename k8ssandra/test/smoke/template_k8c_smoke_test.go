@@ -33,7 +33,7 @@ func TestGoogleTemplate(t *testing.T) {
 		Region:      "us-central1",
 		Location:    "us-central1-a",
 		Environment: "dev",
-		MachineType: "n2-highmem-8",
+		MachineType: "<SIZING-BASED-ON-NEEDS> e.g. e2-highcpu-8",
 		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
 		Bucket:      "google_storage_bucket",
 	}
