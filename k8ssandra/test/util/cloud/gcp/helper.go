@@ -15,3 +15,12 @@ limitations under the License.
 **/
 
 package gcp
+
+import (
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+)
+
+func ConstructFullContextName(contextName string, config model.ReadinessConfig) string {
+	return "gke_" + config.ProvisionConfig.CloudConfig.Project + "_" + config.ProvisionConfig.CloudConfig.Region + "_" +
+		config.ProvisionConfig.CloudConfig.Environment + "-" + contextName
+}

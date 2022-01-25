@@ -19,7 +19,8 @@ limitations under the License.
 import (
 	"github.com/gruntwork-io/terratest/modules/random"
 	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
-	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
+	_ "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
 	"strings"
 	"testing"
 )
@@ -97,6 +98,6 @@ func TestK8cSmoke(t *testing.T) {
 		ProvisionConfig:   provisionConfig,
 	}
 
-	// ProvisionMultiCluster(t, k8cReadinessConfig)
-	InstallK8ssandra(t, k8cReadinessConfig, "k8ssandra-operator")
+	// util.ProvisionMultiCluster(t, k8cReadinessConfig)
+	util.InstallK8ssandra(t, k8cReadinessConfig, "k8ssandra-operator")
 }

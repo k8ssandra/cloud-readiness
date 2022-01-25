@@ -19,7 +19,6 @@ package framework
 import (
 	"context"
 	"fmt"
-	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	reaperapi "github.com/k8ssandra/k8ssandra-operator/apis/reaper/v1alpha1"
@@ -59,26 +58,28 @@ const (
 
 type E2eFramework struct {
 	*Framework
-
 	nodeToolStatusUN *regexp.Regexp
 }
 
 func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
-	options map[string]*k8s.KubectlOptions) (*E2eFramework, error) {
+	options map[string]model.ContextOption) (*E2eFramework, error) {
 
 	controlPlaneContext := ""
 	var controlPlaneClient client.Client
 	remoteClients := make(map[string]client.Client, 0)
 
 	logger.Log(t, "looking through the range of contexts ... ")
-	for name, option := range options {
-		config, err := clientcmd.LoadFromFile(option.ConfigPath)
+	for sn, ctxOption := range options {
+
+		fn := ctxOption.FullName
+		config, err := clientcmd.LoadFromFile(ctxOption.KubeOptions.ConfigPath)
 		if err != nil {
 			return nil, err
 		}
 
-		logger.Log(t, fmt.Sprintf("name: %s", name))
-		clientCfg := clientcmd.NewNonInteractiveClientConfig(*config, name, &clientcmd.ConfigOverrides{}, nil)
+		logger.Log(t, fmt.Sprintf("ctx fullname: %s", fn))
+		clientCfg := clientcmd.NewNonInteractiveClientConfig(*config, fn,
+			&clientcmd.ConfigOverrides{}, nil)
 		restCfg, err := clientCfg.ClientConfig()
 
 		if err != nil {
@@ -90,12 +91,12 @@ func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
 			return nil, err
 		}
 
-		if len(controlPlaneContext) == 0 && slices.Contains(contexts[name].ClusterLabels, "control-plane") {
-			logger.Log(t, fmt.Sprintf("identified the control-plane cluster: "), name)
-			controlPlaneContext = name
+		if len(controlPlaneContext) == 0 && slices.Contains(contexts[sn].ClusterLabels, "control-plane") {
+			logger.Log(t, fmt.Sprintf("identified the control-plane cluster: "), fn)
+			controlPlaneContext = fn
 			controlPlaneClient = remoteClient
 		}
-		remoteClients[name] = remoteClient
+		remoteClients[fn] = remoteClient
 	}
 
 	require.NotEmpty(t, controlPlaneContext, "Unable to identify the control-plane cluster!")

@@ -32,10 +32,10 @@ import (
 
 // CheckNodesReady checks for N nodes in ready state with retries having sleep seconds
 func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber int,
-	retries int, sleepSecsBetween time.Duration) {
-	waitUntilExpectedNodes(t, options, expectedNumber, retries, sleepSecsBetween*time.Second)
+	retries int, sleepSecsBetween int) {
+	waitUntilExpectedNodes(t, options, expectedNumber, retries, time.Duration(sleepSecsBetween)*time.Second)
 
-	k8s.WaitUntilAllNodesReady(t, options, retries, sleepSecsBetween*time.Second)
+	k8s.WaitUntilAllNodesReady(t, options, retries, time.Duration(sleepSecsBetween)*time.Second)
 	readyNodes := k8s.GetReadyNodes(t, options)
 	assert.Equal(t, len(readyNodes), expectedNumber)
 }

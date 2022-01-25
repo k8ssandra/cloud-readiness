@@ -16,6 +16,8 @@ limitations under the License.
 
 package model
 
+import "github.com/gruntwork-io/terratest/modules/k8s"
+
 type CloudConfig struct {
 	Type        string
 	Location    string
@@ -41,7 +43,7 @@ type K8cConfig struct {
 	MedusaSecretFromFileKey string
 	MedusaSecretFromFile    string
 	ValuesFilePath          string
-	ClusterScoped			bool
+	ClusterScoped           bool
 }
 
 type ProvisionConfig struct {
@@ -68,6 +70,11 @@ type ContextConfig struct {
 	ClusterLabels []string
 }
 
+type ContextOption struct {
+	FullName    string
+	KubeOptions *k8s.KubectlOptions
+}
+
 type ReadinessConfig struct {
 	ProvisionConfig          ProvisionConfig
 	KubectlConfigPath        string
@@ -79,5 +86,4 @@ type ReadinessConfig struct {
 }
 
 type ServiceAccountConfig struct {
-
 }
