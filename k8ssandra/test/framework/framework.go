@@ -104,7 +104,8 @@ func (k ClusterKey) String() string {
 	return k.K8sContext + string(types.Separator) + k.Namespace + string(types.Separator) + k.Name
 }
 
-func NewFramework(t *testing.T, client client.Client, controlPlanContext string, remoteClients map[string]client.Client) *Framework {
+func NewFramework(t *testing.T, client client.Client, controlPlanContext string,
+	remoteClients map[string]client.Client) *Framework {
 	return &Framework{Client: client, ControlPlaneContext: controlPlanContext, remoteClients: remoteClients, test: t}
 }
 

@@ -62,7 +62,7 @@ type E2eFramework struct {
 }
 
 func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
-	options map[string]model.ContextOption) (*E2eFramework, error) {
+	options map[string]model.ContextOption, targetEnv string) (*E2eFramework, error) {
 
 	controlPlaneContext := ""
 	var controlPlaneClient client.Client
@@ -78,14 +78,27 @@ func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
 		}
 
 		logger.Log(t, fmt.Sprintf("ctx fullname: %s", fn))
+		logger.Log(t, fmt.Sprintf("ctx shortname: %s", sn))
+		//for c := range config.Clusters {
+		//	logger.Log(t, fmt.Sprintf("cluster: %s", c))
+		//}
+
+		// logger.Log(t, fmt.Sprintf("env: %s", targetEnv))
+		//clusterRefName := targetEnv+"-"+sn
+		//logger.Log(t, fmt.Sprintf("clusterRefName: %s", clusterRefName))
+
 		clientCfg := clientcmd.NewNonInteractiveClientConfig(*config, fn,
 			&clientcmd.ConfigOverrides{}, nil)
+
+		logger.Log(t, "Building the client config ... ")
 		restCfg, err := clientCfg.ClientConfig()
 
 		if err != nil {
 			return nil, err
 		}
 
+		// TODO - sometimes will timeout, so a retry might be good in that case.
+		logger.Log(t, "Building the remote client ... ")
 		remoteClient, err := client.New(restCfg, client.Options{Scheme: scheme.Scheme})
 		if err != nil {
 			return nil, err
@@ -100,7 +113,6 @@ func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
 	}
 
 	require.NotEmpty(t, controlPlaneContext, "Unable to identify the control-plane cluster!")
-
 	f := NewFramework(t, controlPlaneClient, controlPlaneContext, remoteClients)
 	re := regexp.MustCompile("UN\\s\\s")
 	return &E2eFramework{Framework: f, nodeToolStatusUN: re}, nil
