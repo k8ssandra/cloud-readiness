@@ -1,3 +1,5 @@
+package util
+
 /**
 Copyright 2022 DataStax, Inc.
 
@@ -14,9 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
-package util
-
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -25,6 +26,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -115,4 +118,39 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 		t.Fatal(err)
 	}
 	logger.Log(t, message)
+}
+
+func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string) string {
+	logger.Log(t, fmt.Sprintf("obtaining certification with secret: %s", secret))
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-o", "jsonpath={.data['ca\\.crt']}")
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.NotEmpty(t, out)
+	return out
+}
+
+func fetchToken(t *testing.T, options *k8s.KubectlOptions, secret string) string {
+
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName,
+		"-n", options.Namespace, "get", "secret", secret, "-o", "jsonpath={.data.token}")
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+
+	decoded, err := base64.StdEncoding.DecodeString(out)
+	if err != nil {
+		log.Fatalf("Some error occured during base64 decode. Error %s", err.Error())
+	}
+	return string(decoded)
+}
+
+func fetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string) string {
+
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName, "-n",
+		options.Namespace, "get", "serviceaccount", serviceAccount, "-o", "jsonpath={.secrets[0].name}")
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	return out
 }

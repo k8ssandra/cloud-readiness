@@ -17,18 +17,17 @@ limitations under the License.
 **/
 
 import (
-	"encoding/base64"
+	_ "context"
 	"fmt"
 	"github.com/gruntwork-io/terratest/modules/helm"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	ts "github.com/gruntwork-io/terratest/modules/test-structure"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/framework"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
-	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util/cloud/gcp"
 	"github.com/stretchr/testify/require"
-	"log"
 	"path"
 	"strconv"
 	"testing"
@@ -47,8 +46,9 @@ const (
 	defaultCertManagerRepositoryURL     = "https://charts.jetstack.io"
 )
 
-func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) {
+func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) model.ProvisionMeta {
 
+	provisionMeta := model.ProvisionMeta{ProvisionId: random.UniqueId()}
 	provConfig := config.ProvisionConfig
 	tfConfig := provConfig.TFConfig
 
@@ -56,8 +56,10 @@ func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) {
 		tfModulesFolder := ts.CopyTerraformFolderToTemp(t, "../..", tfConfig.ModuleFolder)
 		kubeConfigPath := k8s.CopyHomeKubeConfigToTemp(t)
 		tfOptions := CreateOptions(t, config, path.Join(tfModulesFolder, defaultTestSubFolder), kubeConfigPath)
+		provisionMeta.KubeConfigs[name] = kubeConfigPath
 		provisionCluster(t, name, ctx, kubeConfigPath, tfOptions, config, tfModulesFolder)
 	}
+	return provisionMeta
 }
 
 func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, kubeConfigPath string,
@@ -97,76 +99,13 @@ func createHelmOptions(options *k8s.KubectlOptions, values map[string]string) *h
 	return helmOptions
 }
 
-func fetchServiceAccountConfig(t *testing.T, options map[string]*k8s.KubectlOptions, controlPlaneContext string,
-	serviceAccount string) model.ServiceAccountConfig {
-
-	serviceAccountSecret := fetchSecret(t, options[controlPlaneContext], serviceAccount)
-	require.NotNil(t, serviceAccountSecret)
-	logger.Log(t, fmt.Sprintf("service account [secret] obtained: %s", serviceAccountSecret))
-
-	serviceAccountToken := fetchToken(t, options[controlPlaneContext], controlPlaneContext, serviceAccountSecret)
-	require.NotNil(t, serviceAccountToken)
-	logger.Log(t, fmt.Sprintf("service account [token] obtained: %s", serviceAccountToken))
-
-	certificate := fetchCertificate(t, options[controlPlaneContext], controlPlaneContext, serviceAccountSecret)
-	logger.Log(t, fmt.Sprintf("service account [cert] obtained: %s", certificate))
-
-	return model.ServiceAccountConfig{}
-}
-
-func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, contextName string, secret string) string {
-
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", contextName,
-		"-n", options.Namespace, "get", "secret", secret, "-o", "jsonpath={.data['ca.crt']}")
-	require.NoError(t, err)
-
-	// TODO fix not getting ca.crt back from query
-	// require.NotEmpty(t, out)
-	return out
-}
-
-func fetchToken(t *testing.T, options *k8s.KubectlOptions, contextName string, secret string) string {
-
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", contextName,
-		"-n", options.Namespace, "get", "secret", secret, "-o", "jsonpath={.data.token}")
-	require.NoError(t, err)
-	require.NotNil(t, out)
-
-	decoded, err := base64.StdEncoding.DecodeString(out)
-	if err != nil {
-		log.Fatalf("Some error occured during base64 decode. Error %s", err.Error())
-	}
-	return string(decoded)
-}
-
-func fetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string) string {
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName, "-n",
-		options.Namespace, "get", "serviceaccount", serviceAccount, "-o", "jsonpath={.secrets[0].name}")
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	return out
-}
-
-func createKubeConfigs(t *testing.T, config model.ReadinessConfig) map[string]model.ContextOption {
-
-	options := map[string]model.ContextOption{}
-
-	for name, ctx := range config.Contexts {
-		kubeConfigPath := k8s.CopyHomeKubeConfigToTemp(t)
-		fn := gcp.ConstructFullContextName(name, config)
-		kops := k8s.NewKubectlOptions(fn, kubeConfigPath, ctx.Namespace)
-		options[name] = model.ContextOption{FullName: fn, KubeOptions: kops}
-	}
-	return options
-}
-
 func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string, options *k8s.KubectlOptions) {
 	logger.Log(t, fmt.Sprintf("deploying k8ssandra-cluster "+
 		"for context: [%s] namespace: [%s]", contextName, options.Namespace))
 
 	k8cConfig := config.ProvisionConfig.K8cConfig
 	k8cClusterFile := path.Join("../config/", k8cConfig.ValuesFilePath)
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "-n", options.Namespace,
+	out, err := k8s.RunKubectlAndGetOutputE(t, options,
 		"apply", "-f", k8cClusterFile, "--validate=true")
 
 	require.NoError(t, err)
@@ -250,23 +189,6 @@ func createNamespace(t *testing.T, kubectlOptions *k8s.KubectlOptions, namespace
 	if err != nil {
 		logger.Log(t, fmt.Sprintf("failed create namespace: %s due to error: %s", namespace, err.Error()))
 	}
-}
-
-func restartControlPlaneOperator(t *testing.T, options *k8s.KubectlOptions, config model.ReadinessConfig) {
-	// TODO
-	// kubectl -n k8ssandra-operator rollout restart deployment k8ssandra-operator-k8ssandra-operator
-	//k8cConfig := config.ProvisionConfig.K8cConfig
-	//k8cClusterFile := path.Join("../config/", k8cConfig.ValuesFilePath)
-	//out, err := k8s.RunKubectlAndGetOutputE(t, options, "-n", options.Namespace, "rollout", "restart", "deployment")
-	//
-	//require.NoError(t, err)
-	//require.NotNil(t, out)
-	//logger.Log(t, out)
-}
-
-func verifyControlPlane(t *testing.T, context string) {
-	// TODO
-	// k8ssandra-operator-k8ssandra-operator -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="K8SSANDRA_CONTROL_PLANE")].value}'
 }
 
 func removeTestKubeConfigFolder(t *testing.T, kubectlConfigPath string) {
