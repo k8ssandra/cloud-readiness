@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      certificate-authority-data: ${ca_cert}
+      server: $cluster_addr
+    name: ${cluster}
+contexts:
+  - context:
+      cluster: $cluster
+      user: $cluster-$service_account
+    name: $src_context
+current-context: $src_context
+preferences: {}
+users:
+  - name: $cluster-$service_account
+    user:
+      token: $sa_token
