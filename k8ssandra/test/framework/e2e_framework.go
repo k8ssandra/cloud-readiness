@@ -72,7 +72,7 @@ func NewE2eFramework(t *testing.T, contexts map[string]model.ContextConfig,
 	for sn, ctxOption := range options {
 
 		fn := ctxOption.FullName
-		config, err := clientcmd.LoadFromFile(ctxOption.KubeOptions.ConfigPath)
+		config, err := clientcmd.LoadFromFile(ctxOption.KubectlOptions.ConfigPath)
 		if err != nil {
 			return nil, err
 		}

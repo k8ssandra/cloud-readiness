@@ -17,10 +17,21 @@ limitations under the License.
 package gcp
 
 import (
+	"github.com/gruntwork-io/terratest/modules/gcp"
+	_ "github.com/gruntwork-io/terratest/modules/gcp"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+	"testing"
 )
 
 func ConstructFullContextName(contextName string, config model.ReadinessConfig) string {
 	return "gke_" + config.ProvisionConfig.CloudConfig.Project + "_" + config.ProvisionConfig.CloudConfig.Region + "_" +
 		config.ProvisionConfig.CloudConfig.Environment + "-" + contextName
+}
+
+func ConstructCloudClusterName(contextName string, config model.CloudConfig) string {
+	return config.Environment + "-" + contextName
+}
+
+func FetchCreds(t *testing.T) string {
+	return gcp.GetGoogleCredentialsFromEnvVar(t)
 }
