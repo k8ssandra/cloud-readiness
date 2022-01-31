@@ -18,6 +18,7 @@ limitations under the License.
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type CloudConfig struct {
@@ -59,7 +60,7 @@ type ProvisionConfig struct {
 	HelmConfig         HelmConfig  `json:"helm_config"`
 	TFConfig           TFConfig    `json:"tf_config"`
 	CloudConfig        CloudConfig `json:"cloud_config"`
-	K8cConfig          K8cConfig   `json:"k_8_c_config"`
+	K8cConfig          K8cConfig   `json:"k8c_config"`
 }
 
 type ProvisionResult struct {
@@ -73,10 +74,10 @@ type ContextConfig struct {
 }
 
 type ContextOption struct {
-	FullName       string                `json:"full_name,omitempty" yaml:"full_name"`
-	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options" yaml:"kubectl_options"`
-	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account"`
-	ServerAddress  string                `json:"server_address" json:"server_address"`
+	FullName       string                `json:"full_name,omitempty" yaml:"full_name,omitempty"`
+	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options" yaml:"kubectl_options,omitempty"`
+	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
+	ServerAddress  string                `json:"server_address" yaml:"server_address,omitempty"`
 }
 
 type ReadinessConfig struct {
@@ -90,15 +91,32 @@ type ReadinessConfig struct {
 }
 
 type ContextServiceAccount struct {
-	Name      string `json:"name" yaml:"name"`
-	Secret    string `json:"secret" yaml:"secret"`
-	Token     string `json:"token" yaml:"token"`
-	Cert      string `json:"cert" yaml:"cert"`
-	Namespace string `json:"namespace" yaml:"namespace"`
+	Name      string `json:"name" yaml:"name,omitempty"`
+	Secret    string `json:"secret" yaml:"secret,omitempty"`
+	Token     string `json:"token" yaml:"token,omitempty"`
+	Cert      string `json:"cert" yaml:"cert,omitempty"`
+	Namespace string `json:"namespace" yaml:"namespace,omitempty"`
 }
 
 type ProvisionMeta struct {
+	Enabled        bool              `json:"enabled,omitempty"`
 	ProvisionId    string            `json:"provision_id,omitempty"`
 	KubeConfigs    map[string]string `json:"kube_configs,omitempty"`
 	ServiceAccount string            `json:"service_account"`
+}
+
+type ObjectMeta struct {
+	Name string `yaml:"name"`
+}
+
+type ClientConfigSpec struct {
+	ContextName      string                      `yaml:"contextName"`
+	KubeConfigSecret corev1.LocalObjectReference `yaml:"kubeConfigSecret"`
+}
+
+type ClientConfig struct {
+	ApiVersion string           `yaml:"apiVersion"`
+	Kind       string           `yaml:"kind"`
+	Metadata   ObjectMeta       `yaml:"metadata"`
+	Spec       ClientConfigSpec `yaml:"spec"`
 }
