@@ -121,12 +121,15 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 }
 
 func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string) string {
+
 	logger.Log(t, fmt.Sprintf("obtaining certification with secret: %s", secret))
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-o", "jsonpath={.data['ca\\.crt']}")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	require.NotEmpty(t, out)
+
+	logger.Log(t, fmt.Sprintf("certificate obtained: %s", out))
 	return out
 }
 
@@ -147,8 +150,8 @@ func fetchToken(t *testing.T, options *k8s.KubectlOptions, secret string) string
 
 func fetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string) string {
 
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName, "-n",
-		options.Namespace, "get", "serviceaccount", serviceAccount, "-o", "jsonpath={.secrets[0].name}")
+	out, err := k8s.RunKubectlAndGetOutputE(t, options,
+		"get", "serviceaccount", serviceAccount, "-o", "jsonpath={.secrets[0].name}")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
