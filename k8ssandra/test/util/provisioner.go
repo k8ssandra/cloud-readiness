@@ -19,6 +19,7 @@ limitations under the License.
 import (
 	_ "context"
 	"fmt"
+	"github.com/gruntwork-io/terratest/modules/files"
 	"github.com/gruntwork-io/terratest/modules/helm"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
@@ -28,6 +29,7 @@ import (
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/framework"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/stretchr/testify/require"
+	"os"
 	"path"
 	"strconv"
 	"testing"
@@ -44,29 +46,63 @@ const (
 	defaultCertManagerFile              = "https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml"
 	defaultCertManagerRepositoryName    = "jetstack"
 	defaultCertManagerRepositoryURL     = "https://charts.jetstack.io"
+	defaultRelativeRootFolder           = "../.."
+	prefixFolderName                    = "cloud-k8c-"
 )
 
-func ProvisionMultiCluster(t *testing.T, config model.ReadinessConfig) model.ProvisionMeta {
+func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) model.ProvisionMeta {
 
-	provisionMeta := model.ProvisionMeta{ProvisionId: random.UniqueId()}
-	provConfig := config.ProvisionConfig
+
+	uniqueProvisionId:=random.UniqueId()
+	provisionMeta := model.ProvisionMeta{
+		KubeConfigs:    map[string]string{},
+		ProvisionId:    uniqueProvisionId,
+		ServiceAccount: defaultServiceAccountName,
+		ArtifactsRootDir: path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
+
+	}
+
+	provConfig := readinessConfig.ProvisionConfig
 	tfConfig := provConfig.TFConfig
 
-	for name, ctx := range config.Contexts {
-		tfModulesFolder := ts.CopyTerraformFolderToTemp(t, "../..", tfConfig.ModuleFolder)
-		kubeConfigPath := k8s.CopyHomeKubeConfigToTemp(t)
-		tfOptions := CreateOptions(t, config, path.Join(tfModulesFolder, defaultTestSubFolder), kubeConfigPath)
-		provisionMeta.KubeConfigs[name] = kubeConfigPath
-		provisionCluster(t, name, ctx, kubeConfigPath, tfOptions, config, tfModulesFolder)
+	kubeConfigFile := initTempArtifacts(t, provisionMeta)
+
+	for name, ctx := range readinessConfig.Contexts {
+
+		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
+
+		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), kubeConfigFile)
+
+		provisionMeta.KubeConfigs[name] = kubeConfigFile
+
+		provisionCluster(t, name, ctx, readinessConfig, kubeConfigFile, options, modulesFolder)
 	}
 	return provisionMeta
 }
 
-func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, kubeConfigPath string,
-	tfOptions map[string]*terraform.Options, config model.ReadinessConfig, tfModulesFolder string) {
+func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) string {
+
+	var rootTempDir = meta.ArtifactsRootDir
+	if files.IsExistingDir(rootTempDir) {
+		err := os.Remove(rootTempDir)
+		require.NoError(t, err, fmt.Sprintf("failed to remove a tmp root dir: %s", rootTempDir))
+	}
+
+	mkdirErr := os.MkdirAll(rootTempDir, defaultTempFilePerm)
+	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
+
+	//kubeConfigFile := path.Join(rootTempDir, meta.ProvisionId+suffixConfigFileName)
+	//_, createErr := os.Create(kubeConfigFile)
+	//require.NoError(t, createErr, fmt.Sprintf("failed to create file name: %s", kubeConfigFile))
+	return rootTempDir
+}
+
+func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig, kubeConfigPath string,
+	tfOptions map[string]*terraform.Options, tfModulesFolder string) {
 
 	provConfig := config.ProvisionConfig
 	kubeOptions := k8s.NewKubectlOptions(name, kubeConfigPath, ctx.Namespace)
+	logger.Log(t, fmt.Sprintf("kube options created: %s", kubeConfigPath))
 
 	provisionSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
 		t.Parallel()
@@ -170,6 +206,7 @@ func apply(t *testing.T, options *terraform.Options, kubectlOptions *k8s.Kubectl
 	config model.ReadinessConfig) {
 
 	provConfig := config.ProvisionConfig
+
 	terraform.InitAndApply(t, options)
 
 	if provConfig.PreTestCleanup {

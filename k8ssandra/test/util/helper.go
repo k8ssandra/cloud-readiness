@@ -45,15 +45,16 @@ func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber i
 
 // CreateOptions constructs Terraform options, which include kubeConfig path.
 // Names for cluster, service account, and buckets are made to be specific based on the ID provided.
-func CreateOptions(t *testing.T, config model.ReadinessConfig, rootFolder string, kubeConfigPath string) map[string]*terraform.Options {
+func CreateOptions(config model.ReadinessConfig, rootFolder string,
+	kubeConfigPath string) map[string]*terraform.Options {
 
 	provConfig := config.ProvisionConfig
 	cloudConfig := provConfig.CloudConfig
+
 	var tfOptions = map[string]*terraform.Options{}
+	for name := range config.Contexts {
 
-	for name, _ := range config.Contexts {
 		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-
 		uniqueServiceAccountName := strings.ToLower(fmt.Sprintf(config.ServiceAccountNamePrefix+"-%s", config.UniqueId))
 		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
 
@@ -78,7 +79,6 @@ func CreateOptions(t *testing.T, config model.ReadinessConfig, rootFolder string
 		}
 
 		envVars := map[string]string{cloudConfig.CredKey: cloudConfig.CredPath}
-
 		options := terraform.Options{
 			TerraformDir: rootFolder,
 			Vars:         vars,
@@ -122,7 +122,7 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 
 func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string) string {
 
-	logger.Log(t, fmt.Sprintf("obtaining certification with secret: %s", secret))
+	logger.Log(t, fmt.Sprintf("obtaining certificate with secret: %s", secret))
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-o", "jsonpath={.data['ca\\.crt']}")
 
 	require.NoError(t, err)

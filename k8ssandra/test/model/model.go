@@ -79,6 +79,7 @@ type ContextOption struct {
 	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options" yaml:"kubectl_options,omitempty"`
 	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
 	ServerAddress  string                `json:"server_address" yaml:"server_address,omitempty"`
+	ProvisionMeta  ProvisionMeta         `json:"provision_meta" yaml:"provision_meta"`
 }
 
 type ReadinessConfig struct {
@@ -100,10 +101,11 @@ type ContextServiceAccount struct {
 }
 
 type ProvisionMeta struct {
-	Enabled        bool              `json:"enabled,omitempty"`
-	ProvisionId    string            `json:"provision_id,omitempty"`
-	KubeConfigs    map[string]string `json:"kube_configs,omitempty"`
-	ServiceAccount string            `json:"service_account"`
+	Enabled          bool              `json:"enabled,omitempty"`
+	ProvisionId      string            `json:"provision_id,omitempty"`
+	KubeConfigs      map[string]string `json:"kube_configs,omitempty"`
+	ServiceAccount   string            `json:"service_account"`
+	ArtifactsRootDir string            `json:"artifacts_root_dir"`
 }
 
 type ObjectMeta struct {

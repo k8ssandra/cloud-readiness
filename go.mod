@@ -3,6 +3,7 @@ module github.com/k8ssandra/cloud-readiness
 go 1.16
 
 require (
+	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5 // indirect
 	github.com/datastax/go-cassandra-native-protocol v0.0.0-20211124104234-f6aea54fa801
 	github.com/gruntwork-io/terratest v0.38.8
 	github.com/k8ssandra/cass-operator v1.9.0
