@@ -74,6 +74,7 @@ type ContextConfig struct {
 }
 
 type ContextOption struct {
+	ShortName      string                `json:"short_name" yaml:"short_name"`
 	FullName       string                `json:"full_name,omitempty" yaml:"full_name,omitempty"`
 	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options" yaml:"kubectl_options,omitempty"`
 	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
