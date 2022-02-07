@@ -3,19 +3,20 @@ module github.com/k8ssandra/cloud-readiness
 go 1.16
 
 require (
-	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5 // indirect
 	github.com/datastax/go-cassandra-native-protocol v0.0.0-20211124104234-f6aea54fa801
 	github.com/gruntwork-io/terratest v0.38.8
 	github.com/k8ssandra/cass-operator v1.9.0
 	github.com/k8ssandra/k8ssandra-operator v1.0.0-alpha.2
 	github.com/k8ssandra/reaper-client-go v0.3.1-0.20210617111910-fe2ba92f8efb
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/resty.v1 v1.12.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v0.23.0
+	k8s.io/kubernetes v1.22.2
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	sigs.k8s.io/controller-runtime v0.11.0
 )

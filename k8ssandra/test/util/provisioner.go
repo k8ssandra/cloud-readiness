@@ -52,35 +52,30 @@ const (
 
 func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) model.ProvisionMeta {
 
-
-	uniqueProvisionId:=random.UniqueId()
+	uniqueProvisionId := random.UniqueId()
 	provisionMeta := model.ProvisionMeta{
-		KubeConfigs:    map[string]string{},
-		ProvisionId:    uniqueProvisionId,
-		ServiceAccount: defaultServiceAccountName,
+		KubeConfigs:      map[string]string{},
+		ProvisionId:      uniqueProvisionId,
 		ArtifactsRootDir: path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
-
 	}
 
 	provConfig := readinessConfig.ProvisionConfig
 	tfConfig := provConfig.TFConfig
 
-	kubeConfigFile := initTempArtifacts(t, provisionMeta)
+	initTempArtifacts(t, provisionMeta)
+
+	kubeConfig := provisionMeta.DefaultConfigPath
 
 	for name, ctx := range readinessConfig.Contexts {
 
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
-
-		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), kubeConfigFile)
-
-		provisionMeta.KubeConfigs[name] = kubeConfigFile
-
-		provisionCluster(t, name, ctx, readinessConfig, kubeConfigFile, options, modulesFolder)
+		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), kubeConfig)
+		provisionCluster(t, name, ctx, readinessConfig, kubeConfig, options, modulesFolder)
 	}
 	return provisionMeta
 }
 
-func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) string {
+func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 
 	var rootTempDir = meta.ArtifactsRootDir
 	if files.IsExistingDir(rootTempDir) {
@@ -90,11 +85,6 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) string {
 
 	mkdirErr := os.MkdirAll(rootTempDir, defaultTempFilePerm)
 	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
-
-	//kubeConfigFile := path.Join(rootTempDir, meta.ProvisionId+suffixConfigFileName)
-	//_, createErr := os.Create(kubeConfigFile)
-	//require.NoError(t, createErr, fmt.Sprintf("failed to create file name: %s", kubeConfigFile))
-	return rootTempDir
 }
 
 func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig, kubeConfigPath string,
@@ -128,6 +118,7 @@ func nodeChecks(t *testing.T, name string, options *k8s.KubectlOptions, config m
 }
 
 func createHelmOptions(options *k8s.KubectlOptions, values map[string]string) *helm.Options {
+
 	helmOptions := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: options,

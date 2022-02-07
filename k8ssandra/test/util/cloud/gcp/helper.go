@@ -35,3 +35,5 @@ func ConstructCloudClusterName(contextName string, config model.CloudConfig) str
 func FetchCreds(t *testing.T) string {
 	return gcp.GetGoogleCredentialsFromEnvVar(t)
 }
+
+

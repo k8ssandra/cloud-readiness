@@ -76,7 +76,7 @@ type ContextConfig struct {
 type ContextOption struct {
 	ShortName      string                `json:"short_name" yaml:"short_name"`
 	FullName       string                `json:"full_name,omitempty" yaml:"full_name,omitempty"`
-	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options" yaml:"kubectl_options,omitempty"`
+	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options,omitempty"`
 	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
 	ServerAddress  string                `json:"server_address" yaml:"server_address,omitempty"`
 	ProvisionMeta  ProvisionMeta         `json:"provision_meta" yaml:"provision_meta"`
@@ -101,11 +101,12 @@ type ContextServiceAccount struct {
 }
 
 type ProvisionMeta struct {
-	Enabled          bool              `json:"enabled,omitempty"`
-	ProvisionId      string            `json:"provision_id,omitempty"`
-	KubeConfigs      map[string]string `json:"kube_configs,omitempty"`
-	ServiceAccount   string            `json:"service_account"`
-	ArtifactsRootDir string            `json:"artifacts_root_dir"`
+	Enabled           bool              `json:"enabled,omitempty"`
+	ProvisionId       string            `json:"provision_id,omitempty"`
+	KubeConfigs       map[string]string `json:"kube_configs,omitempty"`
+	ServiceAccount    string            `json:"service_account"`
+	ArtifactsRootDir  string            `json:"artifacts_root_dir"`
+	DefaultConfigPath string            `json:"default_config_path"`
 }
 
 type ObjectMeta struct {
