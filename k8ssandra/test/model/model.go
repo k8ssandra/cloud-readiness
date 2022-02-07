@@ -88,7 +88,7 @@ type ReadinessConfig struct {
 	UniqueId                 string                   `json:"unique_id,omitempty"`
 	RootFolder               string                   `json:"root_folder,omitempty"`
 	Contexts                 map[string]ContextConfig `json:"contexts,omitempty"`
-	ServiceAccountNamePrefix string                   `json:"service_account_name_prefix,omitempty"`
+	ServiceAccountNameSuffix string                   `json:"service_account_name_suffix,omitempty"`
 	ExpectedNodeCount        int                      `json:"expected_node_count,omitempty"`
 }
 

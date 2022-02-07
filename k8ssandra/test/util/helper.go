@@ -25,9 +25,14 @@ import (
 	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util/cloud/gcp"
+	"github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"log"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -55,7 +60,7 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 	for name := range config.Contexts {
 
 		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-		uniqueServiceAccountName := strings.ToLower(fmt.Sprintf(config.ServiceAccountNamePrefix+"-%s", config.UniqueId))
+		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" + config.ServiceAccountNameSuffix
 		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
 
 		vars := map[string]interface{}{
@@ -68,7 +73,7 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 			"kubectl_config_path":     kubeConfigPath,
 			"initial_node_count":      config.ExpectedNodeCount,
 			"cluster_name":            uniqueClusterName,
-			"service_account":         uniqueServiceAccountName,
+			"service_account":         saName,
 			"enable_private_endpoint": false,
 			"enable_private_nodes":    false,
 			"master_ipv4_cidr_block":  "10.0.0.0/28",
@@ -120,10 +125,11 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 	logger.Log(t, message)
 }
 
-func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string) string {
+func FetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
 
 	logger.Log(t, fmt.Sprintf("obtaining certificate with secret: %s", secret))
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-o", "jsonpath={.data['ca\\.crt']}")
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret",
+		secret, "-n", namespace, "-o", "jsonpath={.data['ca\\.crt']}")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
@@ -133,10 +139,10 @@ func fetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string) 
 	return out
 }
 
-func fetchToken(t *testing.T, options *k8s.KubectlOptions, secret string) string {
+func FetchToken(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
 
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName,
-		"-n", options.Namespace, "get", "secret", secret, "-o", "jsonpath={.data.token}")
+		"-n", namespace, "get", "secret", secret, "-o", "jsonpath={.data.token}")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
@@ -148,12 +154,51 @@ func fetchToken(t *testing.T, options *k8s.KubectlOptions, secret string) string
 	return string(decoded)
 }
 
-func fetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string) string {
+func FetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string, namespace string) string {
+
+	logger.Log(t, fmt.Sprintf("FetchSecret ns: %s", namespace))
 
 	out, err := k8s.RunKubectlAndGetOutputE(t, options,
-		"get", "serviceaccount", serviceAccount, "-o", "jsonpath={.secrets[0].name}")
+		"get", "serviceaccount", serviceAccount, "-n", namespace, "-o", "jsonpath={.secrets[0].name}")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	return out
+}
+
+func FetchKubeConfigPath(t *testing.T) string {
+	home, err := homedir.Dir()
+	require.NoError(t, err, "unable to locate home directory for config path")
+	return filepath.Join(home, ".kube", "kubeconfig")
+}
+
+func ExternalizeConfig(t *testing.T, ctxOption model.ContextOption,
+	clientConfig clientcmd.ClientConfig) clientcmd.ClientConfig {
+
+	raw, err := clientConfig.RawConfig()
+	require.NoError(t, err, "expected client config to contain raw config")
+
+	authInfo := *raw.AuthInfos[ctxOption.FullName]
+	require.NotEmpty(t, authInfo, "Expected auth info to be located for user: %s", ctxOption.FullName)
+
+	authInfos := make(map[string]*clientcmdapi.AuthInfo)
+	authInfos = raw.AuthInfos
+	authInfos[ctxOption.FullName] = &clientcmdapi.AuthInfo{
+		AuthProvider: raw.AuthInfos[ctxOption.FullName].AuthProvider,
+		Token:        ctxOption.ServiceAccount.Token,
+	}
+	apiConfig := clientcmdapi.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		Clusters:       raw.Clusters,
+		Contexts:       raw.Contexts,
+		CurrentContext: raw.CurrentContext,
+		AuthInfos:      authInfos,
+	}
+
+	logger.Log(t, "we write here ... ", clientConfig.ConfigAccess().GetExplicitFile())
+	writeErr := clientcmd.WriteToFile(apiConfig, clientConfig.ConfigAccess().GetExplicitFile())
+	require.NoError(t, writeErr, "expected write to file as config")
+
+	return k8s.LoadConfigFromPath(clientConfig.ConfigAccess().GetExplicitFile())
 }

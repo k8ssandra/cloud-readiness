@@ -32,8 +32,10 @@ func ConstructCloudClusterName(contextName string, config model.CloudConfig) str
 	return config.Environment + "-" + contextName
 }
 
+func FetchId(t *testing.T) string {
+	return gcp.GetGoogleIdentityEmailEnvVar(t)
+}
+
 func FetchCreds(t *testing.T) string {
 	return gcp.GetGoogleCredentialsFromEnvVar(t)
 }
-
-
