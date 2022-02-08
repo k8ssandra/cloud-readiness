@@ -107,6 +107,8 @@ type ProvisionMeta struct {
 	ServiceAccount    string            `json:"service_account"`
 	ArtifactsRootDir  string            `json:"artifacts_root_dir"`
 	DefaultConfigPath string            `json:"default_config_path"`
+	DefaultConfigDir  string            `json:"default_config_dir"`
+	AdminIdentity     string            `json:"admin_identity"`
 }
 
 type ObjectMeta struct {
