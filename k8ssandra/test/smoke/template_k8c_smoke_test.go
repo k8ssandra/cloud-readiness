@@ -91,7 +91,7 @@ func TestGoogleTemplate(t *testing.T) {
 	k8cReadinessConfig := ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
 		Contexts:                 contexts,
-		ServiceAccountNamePrefix: "sa",
+		ServiceAccountNameSuffix: "sa",
 		// Expected nodes per zone
 		ExpectedNodeCount: 1,
 		ProvisionConfig:   provisionConfig,
