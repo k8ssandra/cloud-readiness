@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -60,7 +61,7 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 	for name := range config.Contexts {
 
 		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" + config.ServiceAccountNameSuffix
+		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" + config.ServiceAccountNameSuffix + defaultIdentityDomain
 		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
 
 		vars := map[string]interface{}{
@@ -83,7 +84,7 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 			cloudConfig.Bucket:        uniqueBucketName,
 		}
 
-		envVars := map[string]string{cloudConfig.CredKey: cloudConfig.CredPath}
+		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": cloudConfig.CredPath}
 		options := terraform.Options{
 			TerraformDir: rootFolder,
 			Vars:         vars,
@@ -166,10 +167,15 @@ func FetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount strin
 	return out
 }
 
-func FetchKubeConfigPath(t *testing.T) string {
+func FetchKubeConfigPath(t *testing.T) (string, string) {
 	home, err := homedir.Dir()
 	require.NoError(t, err, "unable to locate home directory for config path")
-	return filepath.Join(home, ".kube", "kubeconfig")
+	return home, filepath.Join(home, ".kube", "kubeconfig")
+}
+
+func FetchEnv(t *testing.T, key string) string {
+	require.NotEmpty(t, key, "expecting key to be defined for fetch env")
+	return os.Getenv(key)
 }
 
 func ExternalizeConfig(t *testing.T, ctxOption model.ContextOption,
