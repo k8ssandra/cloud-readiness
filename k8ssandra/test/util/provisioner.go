@@ -41,13 +41,12 @@ const (
 	defaultK8ssandraOperatorReleaseName = "k8ssandra-operator"
 	defaultK8ssandraOperatorChart       = "k8ssandra/k8ssandra-operator"
 	defaultK8ssandraRepositoryURL       = "https://helm.k8ssandra.io/stable"
-	defaultK8ssandraControlPlane        = "github.com/k8ssandra/config/deployments/control-plane"
-	defaultK8ssandraDataPlane           = "github.com/k8ssandra/config/deployments/data-plane"
 	defaultCertManagerFile              = "https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml"
 	defaultCertManagerRepositoryName    = "jetstack"
 	defaultCertManagerRepositoryURL     = "https://charts.jetstack.io"
-	defaultRelativeRootFolder           = "../.."
-	prefixFolderName                    = "cloud-k8c-"
+
+	defaultRelativeRootFolder = "../.."
+	prefixFolderName          = "cloud-k8c-"
 )
 
 func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) model.ProvisionMeta {
@@ -64,13 +63,10 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) 
 
 	initTempArtifacts(t, provisionMeta)
 
-	kubeConfig := provisionMeta.DefaultConfigPath
-
 	for name, ctx := range readinessConfig.Contexts {
-
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
-		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), kubeConfig)
-		provisionCluster(t, name, ctx, readinessConfig, kubeConfig, options, modulesFolder)
+		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), provisionMeta.DefaultConfigPath)
+		provisionCluster(t, name, ctx, readinessConfig,  options, provisionMeta, modulesFolder)
 	}
 	return provisionMeta
 }
@@ -87,12 +83,17 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
 }
 
-func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig, kubeConfigPath string,
-	tfOptions map[string]*terraform.Options, tfModulesFolder string) {
+func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig,
+	tfOptions map[string]*terraform.Options, provisionMeta model.ProvisionMeta, tfModulesFolder string) {
 
 	provConfig := config.ProvisionConfig
-	kubeOptions := k8s.NewKubectlOptions(name, kubeConfigPath, ctx.Namespace)
-	logger.Log(t, fmt.Sprintf("kube options created: %s", kubeConfigPath))
+	if files.FileExists(provisionMeta.DefaultConfigPath) {
+		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", provisionMeta.DefaultConfigPath))
+		cpErr:=files.CopyFile(provisionMeta.DefaultConfigPath, provisionMeta.DefaultConfigPath+"-backup" )
+		require.NoError(t, cpErr, "expecting backup of default config file")
+	}
+	kubeOptions := k8s.NewKubectlOptions(name, 	provisionMeta.DefaultConfigPath, ctx.Namespace)
+	logger.Log(t, fmt.Sprintf("kube config created: %s", 	provisionMeta.DefaultConfigPath))
 
 	provisionSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
 		t.Parallel()
@@ -105,35 +106,24 @@ func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config
 	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
 }
 
-func nodeChecks(t *testing.T, name string, options *k8s.KubectlOptions, config model.ReadinessConfig) {
-
-	provConfig := config.ProvisionConfig
-	checkNodesSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
-		t.Parallel()
-		CheckNodesReady(t, options, config.ExpectedNodeCount,
-			provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
-	})
-	logger.Log(t, fmt.Sprintf("CheckNodesReady name:%s result: %s", name,
-		strconv.FormatBool(checkNodesSuccess)))
-}
-
-func createHelmOptions(options *k8s.KubectlOptions, values map[string]string) *helm.Options {
+func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string) *helm.Options {
 
 	helmOptions := &helm.Options{
 		SetValues:      values,
-		KubectlOptions: options,
+		KubectlOptions: kubeConfig,
+		EnvVars: envs,
 	}
 	return helmOptions
 }
 
-func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string, options *k8s.KubectlOptions) {
+func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string, options *k8s.KubectlOptions, namespace string) {
 	logger.Log(t, fmt.Sprintf("deploying k8ssandra-cluster "+
-		"for context: [%s] namespace: [%s]", contextName, options.Namespace))
+		"for context: [%s] namespace: [%s]", contextName, namespace))
 
 	k8cConfig := config.ProvisionConfig.K8cConfig
 	k8cClusterFile := path.Join("../config/", k8cConfig.ValuesFilePath)
 	out, err := k8s.RunKubectlAndGetOutputE(t, options,
-		"apply", "-f", k8cClusterFile, "--validate=true")
+		"apply", "-f", k8cClusterFile, "-n", namespace, "--validate=true")
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
@@ -144,9 +134,6 @@ func Cleanup(t *testing.T, options *terraform.Options, testModulesPath string, k
 	logger.Log(t, "cleanup started")
 	out := terraform.Destroy(t, options)
 	logger.Log(t, fmt.Sprintf("destroy output: %s", out))
-
-	removeTestKubeConfigFolder(t, kubectlConfigPath)
-	removeTestDataFolder(t, testModulesPath)
 }
 
 func medusaSecretSetup(t *testing.T, kubectlOptions *k8s.KubectlOptions, k8cConfig model.K8cConfig, namespace string) {
@@ -217,15 +204,4 @@ func createNamespace(t *testing.T, kubectlOptions *k8s.KubectlOptions, namespace
 	if err != nil {
 		logger.Log(t, fmt.Sprintf("failed create namespace: %s due to error: %s", namespace, err.Error()))
 	}
-}
-
-func removeTestKubeConfigFolder(t *testing.T, kubectlConfigPath string) {
-	// TODO
-	//err := os.Remove(kubectlConfigPath)
-	//require.NoError(t, err)
-}
-
-func removeTestDataFolder(t *testing.T, testModulesPath string) {
-	// TODO
-	// ts.CleanupTestDataFolder(t, testModulesPath)
 }
