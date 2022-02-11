@@ -27,6 +27,19 @@ import (
 
 func TestK8cSmoke(t *testing.T) {
 
+	configRootDir, configPath := util.FetchKubeConfigPath(t)
+	// when enabled, utilize an existing set of kubeconfigs related to context short-names
+	var meta = ProvisionMeta{
+		Enabled:           true,
+		ProvisionId:       "FpWdV6",
+		KubeConfigs:       nil,
+		ServiceAccount:    "",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-FpWdV6",
+		DefaultConfigPath: configPath,
+		DefaultConfigDir:  configRootDir,
+		AdminIdentity:     "K8C_ADMIN_ID",
+	}
+
 	cloudConfig := CloudConfig{
 		Project:     "community-ecosystem",
 		Region:      "us-central1",
@@ -42,7 +55,7 @@ func TestK8cSmoke(t *testing.T) {
 		MedusaSecretName:        "dev-k8ssandra-medusa-key",
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
-		ValuesFilePath:          "k8ssandra-clusters-v1.yaml",
+		ValuesFilePath:          "k8ssandra-clusters-v2.yaml",
 		ClusterScoped:           false,
 	}
 
@@ -92,12 +105,11 @@ func TestK8cSmoke(t *testing.T) {
 	k8cReadinessConfig := ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
 		Contexts:                 contexts,
-		ServiceAccountNamePrefix: "sa",
+		ServiceAccountNameSuffix: "sa",
 		// Expected nodes per zone
 		ExpectedNodeCount: 1,
 		ProvisionConfig:   provisionConfig,
 	}
 
-	// util.ProvisionMultiCluster(t, k8cReadinessConfig)
-	util.InstallK8ssandra(t, k8cReadinessConfig, "k8ssandra-operator")
+	util.Apply(t, meta, k8cReadinessConfig)
 }
