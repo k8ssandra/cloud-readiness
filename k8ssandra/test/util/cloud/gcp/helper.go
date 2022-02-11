@@ -17,9 +17,15 @@ limitations under the License.
 package gcp
 
 import (
-	"github.com/gruntwork-io/terratest/modules/gcp"
+	"fmt"
 	_ "github.com/gruntwork-io/terratest/modules/gcp"
+	"github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/gruntwork-io/terratest/modules/random"
+	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+	"github.com/stretchr/testify/require"
+	"os"
+	"path"
 	"testing"
 )
 
@@ -32,10 +38,79 @@ func ConstructCloudClusterName(contextName string, config model.CloudConfig) str
 	return config.Environment + "-" + contextName
 }
 
-func FetchId(t *testing.T) string {
-	return gcp.GetGoogleIdentityEmailEnvVar(t)
+func FetchCreds(t *testing.T, readinessConfig model.ReadinessConfig, env map[string]string, clusterName string) bool {
+	region := readinessConfig.ProvisionConfig.CloudConfig.Region
+	project := readinessConfig.ProvisionConfig.CloudConfig.Project
+	args := []string{"container", "clusters", "get-credentials", clusterName, "--region", region, "--project", project}
+	var cmd = shell.Command{
+		Command:    "gcloud",
+		Args:       args,
+		WorkingDir: "/tmp",
+		Env:        env,
+		Logger:     logger.Default,
+	}
+	_, cmdErr := shell.RunCommandAndGetOutputE(t, cmd)
+	if cmdErr != nil {
+		logger.Log(t, fmt.Sprintf("failed service account activation key create: %s", cmdErr))
+		return false
+	}
+	return true
+
 }
 
-func FetchCreds(t *testing.T) string {
-	return gcp.GetGoogleCredentialsFromEnvVar(t)
+func Switch(t *testing.T, serviceAccount string, env map[string]string) bool {
+	args := []string{"config", "set", "account", serviceAccount}
+	var cmd = shell.Command{
+		Command:    "gcloud",
+		Args:       args,
+		WorkingDir: "/tmp",
+		Env:        env,
+		Logger:     logger.Default,
+	}
+	_, cmdErr := shell.RunCommandAndGetOutputE(t, cmd)
+	if cmdErr != nil {
+		logger.Log(t, fmt.Sprintf("failed service account switch to: %s", serviceAccount))
+		return false
+	}
+	logger.Log(t, fmt.Sprintf("switched to service account: %s", serviceAccount))
+	return true
+}
+
+func ActivateServiceAccount(t *testing.T, env map[string]string, dir string, iamAccountName string) bool {
+	require.NotEmpty(t, dir, "expecting directory to be supplied for service account activation activities")
+	require.NotEmpty(t, iamAccountName, "expecting iam account name to be supplied for service account activation activities")
+
+	fn := path.Join(dir, random.UniqueId()+".json")
+
+	defer os.Remove(fn)
+
+	var args = []string{"iam", "service-accounts", "keys", "create", fn, "--iam-account", iamAccountName}
+	var cmd = shell.Command{
+		Command:    "gcloud",
+		Args:       args,
+		WorkingDir: dir,
+		Env:        env,
+		Logger:     logger.Default,
+	}
+
+	var _, cmdErr = shell.RunCommandAndGetOutputE(t, cmd)
+	if cmdErr != nil {
+		logger.Log(t, fmt.Sprintf("failed service account activation key create: %s", cmdErr))
+		return false
+	}
+
+	args = []string{"auth", "activate-service-account", iamAccountName, "--key-file=" + fn}
+	cmd = shell.Command{
+		Command:    "gcloud",
+		Args:       args,
+		WorkingDir: dir,
+		Env:        env,
+		Logger:     logger.Default,
+	}
+	_, cmdErr = shell.RunCommandAndGetOutputE(t, cmd)
+	if cmdErr != nil {
+		logger.Log(t, fmt.Sprintf("failed service account activation key create: %s", cmdErr))
+		return false
+	}
+	return true
 }

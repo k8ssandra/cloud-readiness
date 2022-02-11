@@ -4,7 +4,7 @@
 # Change  the filter as needed for a 'contains' match.
 # A deleted-namespaces.txt file will contain a history of deletions.
 
-NS_CONTAINS_FILTER="k8ssandra"
+NS_CONTAINS_FILTER="bootz"
 kubectl get namespace > namespaces.txt
 
 while read p; do

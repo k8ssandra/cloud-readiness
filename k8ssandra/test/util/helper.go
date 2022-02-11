@@ -39,6 +39,20 @@ import (
 	"time"
 )
 
+// Apply based on provision meta and configuration settings
+func Apply(t *testing.T, meta model.ProvisionMeta, k8cReadinessConfig model.ReadinessConfig) {
+	if !meta.Enabled {
+		logger.Log(t, "an infrastructure provisioning is not being referenced, infrastructure provision started ...")
+		meta = ProvisionMultiCluster(t, k8cReadinessConfig)
+		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
+		logger.Log(t, fmt.Sprintf("provision submitted for identifier: %s", meta.ProvisionId))
+	} else {
+		logger.Log(t, fmt.Sprintf("found an existing infrastructure to reference, identifier: %s", meta.ProvisionId))
+		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
+		InstallK8ssandra(t, k8cReadinessConfig, meta)
+	}
+}
+
 // CheckNodesReady checks for N nodes in ready state with retries having sleep seconds
 func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber int,
 	retries int, sleepSecsBetween int) {
@@ -127,21 +141,13 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 }
 
 func FetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
-
-	logger.Log(t, fmt.Sprintf("obtaining certificate with secret: %s", secret))
-	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret",
-		secret, "-n", namespace, "-o", "jsonpath={.data['ca\\.crt']}")
-
+	logger.Log(t, fmt.Sprintf("obtaining certificate"))
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-n", namespace, "-o", "jsonpath={.data['ca\\.crt']}")
 	require.NoError(t, err)
-	require.NotNil(t, out)
-	require.NotEmpty(t, out)
-
-	logger.Log(t, fmt.Sprintf("certificate obtained: %s", out))
 	return out
 }
 
 func FetchToken(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
-
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "--context", options.ContextName,
 		"-n", namespace, "get", "secret", secret, "-o", "jsonpath={.data.token}")
 
@@ -156,9 +162,6 @@ func FetchToken(t *testing.T, options *k8s.KubectlOptions, secret string, namesp
 }
 
 func FetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string, namespace string) string {
-
-	logger.Log(t, fmt.Sprintf("FetchSecret ns: %s", namespace))
-
 	out, err := k8s.RunKubectlAndGetOutputE(t, options,
 		"get", "serviceaccount", serviceAccount, "-n", namespace, "-o", "jsonpath={.secrets[0].name}")
 
@@ -180,12 +183,11 @@ func FetchEnv(t *testing.T, key string) string {
 
 func ExternalizeConfig(t *testing.T, ctxOption model.ContextOption,
 	clientConfig clientcmd.ClientConfig) clientcmd.ClientConfig {
-
 	raw, err := clientConfig.RawConfig()
 	require.NoError(t, err, "expected client config to contain raw config")
 
 	authInfo := *raw.AuthInfos[ctxOption.FullName]
-	require.NotEmpty(t, authInfo, "Expected auth info to be located for user: %s", ctxOption.FullName)
+	require.NotEmpty(t, authInfo, "expected auth info to be located for user: %s", ctxOption.FullName)
 
 	authInfos := make(map[string]*clientcmdapi.AuthInfo)
 	authInfos = raw.AuthInfos
@@ -201,10 +203,7 @@ func ExternalizeConfig(t *testing.T, ctxOption model.ContextOption,
 		CurrentContext: raw.CurrentContext,
 		AuthInfos:      authInfos,
 	}
-
-	logger.Log(t, "we write here ... ", clientConfig.ConfigAccess().GetExplicitFile())
 	writeErr := clientcmd.WriteToFile(apiConfig, clientConfig.ConfigAccess().GetExplicitFile())
-	require.NoError(t, writeErr, "expected write to file as config")
-
+	require.NoError(t, writeErr, "expected config write")
 	return k8s.LoadConfigFromPath(clientConfig.ConfigAccess().GetExplicitFile())
 }

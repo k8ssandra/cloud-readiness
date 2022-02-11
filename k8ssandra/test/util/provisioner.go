@@ -26,7 +26,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	ts "github.com/gruntwork-io/terratest/modules/test-structure"
-	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/framework"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -50,9 +49,8 @@ const (
 )
 
 func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) model.ProvisionMeta {
-
 	uniqueProvisionId := random.UniqueId()
-	provisionMeta := model.ProvisionMeta{
+	meta := model.ProvisionMeta{
 		KubeConfigs:      map[string]string{},
 		ProvisionId:      uniqueProvisionId,
 		ArtifactsRootDir: path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
@@ -61,18 +59,24 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) 
 	provConfig := readinessConfig.ProvisionConfig
 	tfConfig := provConfig.TFConfig
 
-	initTempArtifacts(t, provisionMeta)
+	initTempArtifacts(t, meta)
 
 	for name, ctx := range readinessConfig.Contexts {
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
-		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder), provisionMeta.DefaultConfigPath)
-		provisionCluster(t, name, ctx, readinessConfig,  options, provisionMeta, modulesFolder)
+		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
+			meta.DefaultConfigPath)
+		provisionCluster(t, name, ctx, readinessConfig, options, meta)
 	}
-	return provisionMeta
+	return meta
+}
+
+func Cleanup(t *testing.T, options *terraform.Options) {
+	logger.Log(t, "cleanup started")
+	out := terraform.Destroy(t, options)
+	logger.Log(t, fmt.Sprintf("destroy output: %s", out))
 }
 
 func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
-
 	var rootTempDir = meta.ArtifactsRootDir
 	if files.IsExistingDir(rootTempDir) {
 		err := os.Remove(rootTempDir)
@@ -84,23 +88,23 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 }
 
 func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig,
-	tfOptions map[string]*terraform.Options, provisionMeta model.ProvisionMeta, tfModulesFolder string) {
+	tfOptions map[string]*terraform.Options, meta model.ProvisionMeta) {
 
 	provConfig := config.ProvisionConfig
-	if files.FileExists(provisionMeta.DefaultConfigPath) {
-		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", provisionMeta.DefaultConfigPath))
-		cpErr:=files.CopyFile(provisionMeta.DefaultConfigPath, provisionMeta.DefaultConfigPath+"-backup" )
+	if files.FileExists(meta.DefaultConfigPath) {
+		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", meta.DefaultConfigPath))
+		cpErr := files.CopyFile(meta.DefaultConfigPath, meta.DefaultConfigPath+"-backup")
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
-	kubeOptions := k8s.NewKubectlOptions(name, 	provisionMeta.DefaultConfigPath, ctx.Namespace)
-	logger.Log(t, fmt.Sprintf("kube config created: %s", 	provisionMeta.DefaultConfigPath))
+	kubeOptions := k8s.NewKubectlOptions(name, meta.DefaultConfigPath, ctx.Namespace)
+	logger.Log(t, fmt.Sprintf("kube config created: %s", meta.DefaultConfigPath))
 
 	provisionSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
 		t.Parallel()
 		if provConfig.CleanOnly {
-			clean(t, tfOptions[name], kubeOptions, tfModulesFolder, config)
+			clean(t, tfOptions[name], kubeOptions, config)
 		} else {
-			apply(t, tfOptions[name], kubeOptions, tfModulesFolder, config)
+			apply(t, tfOptions[name], config)
 		}
 	})
 	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
@@ -111,7 +115,7 @@ func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string,
 	helmOptions := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kubeConfig,
-		EnvVars: envs,
+		EnvVars:        envs,
 	}
 	return helmOptions
 }
@@ -130,31 +134,9 @@ func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextN
 	logger.Log(t, out)
 }
 
-func Cleanup(t *testing.T, options *terraform.Options, testModulesPath string, kubectlConfigPath string) {
-	logger.Log(t, "cleanup started")
-	out := terraform.Destroy(t, options)
-	logger.Log(t, fmt.Sprintf("destroy output: %s", out))
-}
-
-func medusaSecretSetup(t *testing.T, kubectlOptions *k8s.KubectlOptions, k8cConfig model.K8cConfig, namespace string) {
-	logger.Log(t, "creating medusa secret")
-
-	// TODO - extract the raw json file using this ...
-	// terraform output -raw service_account_key > medusa_gcp_key
-
-	_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "create secret generic ", k8cConfig.MedusaSecretName,
-		" --from-file=", k8cConfig.MedusaSecretFromFile, "=", k8cConfig.MedusaSecretFromFileKey,
-		" -n ", namespace)
-
-	if err != nil {
-		logger.Log(t, fmt.Sprintf("Failed to create Medusa generic secret: %s, referencing file: %s ",
-			k8cConfig.MedusaSecretName, k8cConfig.MedusaSecretFromFile))
-	}
-	require.NoError(t, err)
-}
-
 func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
 	logger.Log(t, "setting up repository entries")
+
 	helm.RemoveRepoE(t, helmOptions, defaultCertManagerRepositoryName)
 	helm.AddRepo(t, helmOptions, defaultCertManagerRepositoryName, defaultCertManagerRepositoryURL)
 
@@ -167,41 +149,25 @@ func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
 	return true
 }
 
-func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, testingModules string,
-	config model.ReadinessConfig) {
-
+func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, config model.ReadinessConfig) {
 	logger.Log(t, "clean requested")
 	provConfig := config.ProvisionConfig
 
 	terraform.Init(t, options)
 
-	Cleanup(t, options, testingModules, kubectlOptions.ConfigPath)
+	Cleanup(t, options)
 	CheckNodesReady(t, kubectlOptions, 0,
 		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
 }
 
-func apply(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, tfModulesFolder string,
-	config model.ReadinessConfig) {
-
+func apply(t *testing.T, options *terraform.Options, config model.ReadinessConfig) {
 	provConfig := config.ProvisionConfig
-
 	terraform.InitAndApply(t, options)
 
 	if provConfig.PreTestCleanup {
-		Cleanup(t, options, tfModulesFolder, kubectlOptions.ConfigPath)
+		Cleanup(t, options)
 	}
 	if provConfig.PostTestCleanup {
-		defer Cleanup(t, options, tfModulesFolder, kubectlOptions.ConfigPath)
-	}
-}
-
-func verifyResourceDescriptors(t *testing.T, config model.ReadinessConfig) {
-	require.NoError(t, framework.WaitForCondition(t, "established", "--timeout=240s", "--all", "crd"))
-}
-
-func createNamespace(t *testing.T, kubectlOptions *k8s.KubectlOptions, namespace string) {
-	_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "create ns ", namespace)
-	if err != nil {
-		logger.Log(t, fmt.Sprintf("failed create namespace: %s due to error: %s", namespace, err.Error()))
+		defer Cleanup(t, options)
 	}
 }
