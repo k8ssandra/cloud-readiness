@@ -42,7 +42,7 @@ flexibility to install the [K8ssandra](https://github.com/k8ssandra/k8ssandra) s
 
 Following the test executions, the cleanup and teardown can be controlled based on the type of diagnostics needed.
 
-All of these controls are exposed in the cloud-readiness [models](https://github.com/k8ssandra/cloud-readiness/tree/main/k8ssandra/test/model) and used as inputs for test run execution.  The models provide sharing and reuse for configurations used across verifications.
+All of these controls are exposed in the cloud-readiness [models](https://github.com/k8ssandra/cloud-readiness/blob/main/k8ssandra/test/model/model.go) and used as inputs for test run execution.  The models provide sharing and reuse for configurations used across verifications.
 
 Stay tuned as the installation components evolve to support K8ssandra multi-cluster deployments.
 
