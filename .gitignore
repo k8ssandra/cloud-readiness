@@ -39,3 +39,6 @@ website/vendor
 
 # Keep windows files with windows line endings
 *.winfile eol=crlf
+
+# Local test file
+k8ssandra/test/smoke/k8c_smoke_test.go

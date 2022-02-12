@@ -19,22 +19,36 @@ limitations under the License.
 import (
 	"github.com/gruntwork-io/terratest/modules/random"
 	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
-	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
+	_ "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
 	"strings"
 	"testing"
 )
 
-func TestGoogleTemplate(t *testing.T) {
+func TestK8cSmoke(t *testing.T) {
+
+	configRootDir, configPath := util.FetchKubeConfigPath(t)
+
+	// When enabled, utilizes an existing set provisioned clusters
+	var meta = ProvisionMeta{
+		Enabled:           false,
+		ProvisionId:       "FpWdV6",
+		KubeConfigs:       nil,
+		ServiceAccount:    "",
+		ArtifactsRootDir:  "<reference-dir example: /tmp/cloud-k8c-FpWdV6>",
+		DefaultConfigPath: configPath,
+		DefaultConfigDir:  configRootDir,
+		AdminIdentity:     "K8C_ADMIN_ID",
+	}
 
 	cloudConfig := CloudConfig{
-		Name:        "<UNIQUE-NAME>",
-		CredPath:    "<YOUR-HOME-DIR>/.config/gcloud/application_default_credentials.json",
-		Project:     "<YOUR-PROJ-NAME>",
+		Project:     "community-ecosystem",
 		Region:      "us-central1",
 		Location:    "us-central1-a",
 		Environment: "dev",
-		MachineType: "<SIZING-BASED-ON-NEEDS> e.g. e2-highcpu-8",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
+		MachineType: "e2-highcpu-8",
+		CredPath:    "<your-path-to-creds>",
+		CredKey:     "<example: GOOGLE_APPLICATION_CREDENTIALS>",
 		Bucket:      "google_storage_bucket",
 	}
 
@@ -42,8 +56,8 @@ func TestGoogleTemplate(t *testing.T) {
 		MedusaSecretName:        "dev-k8ssandra-medusa-key",
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
-		ValuesFilePath:          "k8ssandra-clusters.yaml",
-		ClusterScoped:           true,
+		ValuesFilePath:          "k8ssandra-clusters-v2.yaml",
+		ClusterScoped:           false,
 	}
 
 	tfConfig := TFConfig{
@@ -56,7 +70,7 @@ func TestGoogleTemplate(t *testing.T) {
 
 	provisionConfig := ProvisionConfig{
 		CleanOnly:          false,
-		CleanDir:           "<ONLY IF CLEAN-ONLY SET TO TRUE>",
+		CleanDir:           "<as-needed>",
 		PreTestCleanup:     false,
 		PostTestCleanup:    false,
 		TFConfig:           tfConfig,
@@ -69,24 +83,25 @@ func TestGoogleTemplate(t *testing.T) {
 	}
 
 	ctxConfig1 := ContextConfig{
-		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz11",
-		Namespace:     "<YOUR-NS>",
+		Name:          "<ctx-name-1>",
+		Namespace:     "<your-ns>",
 		ClusterLabels: []string{"control-plane"},
 	}
 
 	ctxConfig2 := ContextConfig{
-		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz12",
-		Namespace:     "<YOUR-NS>",
+		Name:          "<ctx-name-2>",
+		Namespace:     "<your-ns>",
 		ClusterLabels: []string{"data-plane"},
 	}
 
 	ctxConfig3 := ContextConfig{
-		Name:          "<FROM-PROV-STEP> EX=gke_community-ecosystem_us-central1_dev-bootz13",
-		Namespace:     "<YOUR-NS>",
+		Name:          "<ctx-name-3>",
+		Namespace:     "<your-ns>",
 		ClusterLabels: []string{"data-plane"},
 	}
 
-	contexts := map[string]ContextConfig{ctxConfig1.Name: ctxConfig1, ctxConfig2.Name: ctxConfig2, ctxConfig3.Name: ctxConfig3}
+	contexts := map[string]ContextConfig{ctxConfig1.Name: ctxConfig1,
+		ctxConfig2.Name: ctxConfig2, ctxConfig3.Name: ctxConfig3}
 
 	k8cReadinessConfig := ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
@@ -97,5 +112,5 @@ func TestGoogleTemplate(t *testing.T) {
 		ProvisionConfig:   provisionConfig,
 	}
 
-	ProvisionMultiCluster(t, k8cReadinessConfig)
+	util.Apply(t, meta, k8cReadinessConfig)
 }
