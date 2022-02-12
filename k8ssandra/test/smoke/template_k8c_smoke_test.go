@@ -25,7 +25,7 @@ import (
 	"testing"
 )
 
-func TestK8cSmoke(t *testing.T) {
+func TestK8cSmokeTemplate(t *testing.T) {
 
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 

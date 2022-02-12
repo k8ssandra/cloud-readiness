@@ -17,10 +17,13 @@ limitations under the License.
 **/
 
 import (
+	"fmt"
+	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
 	_ "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 )
@@ -29,12 +32,12 @@ func TestK8cSmoke(t *testing.T) {
 
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 	// when enabled, utilize an existing set of kubeconfigs related to context short-names
-	var meta = ProvisionMeta{
+	var provisionMeta = ProvisionMeta{
 		Enabled:           true,
-		ProvisionId:       "FpWdV6",
+		ProvisionId:       "4LNs0p",
 		KubeConfigs:       nil,
 		ServiceAccount:    "",
-		ArtifactsRootDir:  "/tmp/cloud-k8c-FpWdV6",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-4LNs0p",
 		DefaultConfigPath: configPath,
 		DefaultConfigDir:  configRootDir,
 		AdminIdentity:     "K8C_ADMIN_ID",
@@ -111,5 +114,15 @@ func TestK8cSmoke(t *testing.T) {
 		ProvisionConfig:   provisionConfig,
 	}
 
-	util.Apply(t, meta, k8cReadinessConfig)
+	if !provisionMeta.Enabled {
+		logger.Log(t, "an infrastructure provisioning is not being referenced, infrastructure provision started ...")
+		provisionMeta = util.ProvisionMultiCluster(t, k8cReadinessConfig)
+		require.NotEmpty(t, provisionMeta.ProvisionId, "expected provision step to occur.")
+		logger.Log(t, fmt.Sprintf("provision submitted for identifier: %s", provisionMeta.ProvisionId))
+	} else {
+		logger.Log(t, fmt.Sprintf("found an existing infrastructure to reference, identifier: %s", provisionMeta.ProvisionId))
+	}
+
+	logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", provisionMeta.ProvisionId))
+	util.InstallK8ssandra(t, k8cReadinessConfig, provisionMeta)
 }
