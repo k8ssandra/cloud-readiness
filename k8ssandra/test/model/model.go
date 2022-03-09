@@ -74,12 +74,12 @@ type ContextConfig struct {
 }
 
 type ContextOption struct {
-	ShortName      string                `json:"short_name" yaml:"short_name"`
-	FullName       string                `json:"full_name,omitempty" yaml:"full_name,omitempty"`
-	KubectlOptions *k8s.KubectlOptions   `json:"kubectl_options,omitempty"`
-	ServiceAccount ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
-	ServerAddress  string                `json:"server_address" yaml:"server_address,omitempty"`
-	ProvisionMeta  ProvisionMeta         `json:"provision_meta" yaml:"provision_meta"`
+	ShortName      string                 `json:"short_name" yaml:"short_name"`
+	FullName       string                 `json:"full_name,omitempty" yaml:"full_name,omitempty"`
+	KubectlOptions *k8s.KubectlOptions    `json:"kubectl_options,omitempty"`
+	ServiceAccount *ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
+	ServerAddress  string                 `json:"server_address" yaml:"server_address,omitempty"`
+	ProvisionMeta  ProvisionMeta          `json:"provision_meta" yaml:"provision_meta"`
 }
 
 type ReadinessConfig struct {
@@ -96,11 +96,12 @@ type ContextServiceAccount struct {
 	Name      string `json:"name" yaml:"name,omitempty"`
 	Secret    string `json:"secret" yaml:"secret,omitempty"`
 	Token     string `json:"token" yaml:"token,omitempty"`
-	Cert      string `json:"cert" yaml:"cert,omitempty"`
+	Cert      []byte `json:"cert"`
 	Namespace string `json:"namespace" yaml:"namespace,omitempty"`
 }
 
 type ProvisionMeta struct {
+	RemoveAll         bool              `json:"remove_all,omitempty"`
 	Enabled           bool              `json:"enabled,omitempty"`
 	ProvisionId       string            `json:"provision_id,omitempty"`
 	KubeConfigs       map[string]string `json:"kube_configs,omitempty"`

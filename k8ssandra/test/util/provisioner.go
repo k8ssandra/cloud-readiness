@@ -46,14 +46,21 @@ const (
 
 	defaultRelativeRootFolder = "../.."
 	prefixFolderName          = "cloud-k8c-"
+	DefaultAdminIdentifier    = "K8C_ADMIN_ID"
 )
 
-func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig) model.ProvisionMeta {
+func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, provisionMeta model.ProvisionMeta) model.ProvisionMeta {
 	uniqueProvisionId := random.UniqueId()
-	meta := model.ProvisionMeta{
-		KubeConfigs:      map[string]string{},
-		ProvisionId:      uniqueProvisionId,
-		ArtifactsRootDir: path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
+
+	var meta = model.ProvisionMeta{
+		KubeConfigs:       map[string]string{},
+		ProvisionId:       uniqueProvisionId,
+		ArtifactsRootDir:  path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
+		Enabled:           provisionMeta.Enabled,
+		ServiceAccount:    provisionMeta.ServiceAccount,
+		DefaultConfigPath: provisionMeta.DefaultConfigPath,
+		DefaultConfigDir:  provisionMeta.DefaultConfigDir,
+		AdminIdentity:     DefaultAdminIdentifier,
 	}
 
 	provConfig := readinessConfig.ProvisionConfig
@@ -96,10 +103,11 @@ func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config
 		cpErr := files.CopyFile(meta.DefaultConfigPath, meta.DefaultConfigPath+"-backup")
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
+
 	kubeOptions := k8s.NewKubectlOptions(name, meta.DefaultConfigPath, ctx.Namespace)
 	logger.Log(t, fmt.Sprintf("kube config created: %s", meta.DefaultConfigPath))
 
-	provisionSuccess := t.Run(fmt.Sprintf("provisioning: %s", name), func(t *testing.T) {
+	provisionSuccess := t.Run(name, func(t *testing.T) {
 		t.Parallel()
 		if provConfig.CleanOnly {
 			clean(t, tfOptions[name], kubeOptions, config)
@@ -107,6 +115,7 @@ func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config
 			apply(t, tfOptions[name], config)
 		}
 	})
+
 	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
 }
 
@@ -120,20 +129,6 @@ func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string,
 	return helmOptions
 }
 
-func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string, options *k8s.KubectlOptions, namespace string) {
-	logger.Log(t, fmt.Sprintf("deploying k8ssandra-cluster "+
-		"for context: [%s] namespace: [%s]", contextName, namespace))
-
-	k8cConfig := config.ProvisionConfig.K8cConfig
-	k8cClusterFile := path.Join("../config/", k8cConfig.ValuesFilePath)
-	out, err := k8s.RunKubectlAndGetOutputE(t, options,
-		"apply", "-f", k8cClusterFile, "-n", namespace, "--validate=true")
-
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	logger.Log(t, out)
-}
-
 func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
 	logger.Log(t, "setting up repository entries")
 
@@ -144,30 +139,32 @@ func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
 	helm.AddRepo(t, helmOptions, defaultK8ssandraRepositoryName, defaultK8ssandraRepositoryURL)
 
 	_, err := helm.RunHelmCommandAndGetStdOutE(t, helmOptions, "repo", "update")
-
 	require.NoError(t, err)
 	return true
 }
 
+// TODO - clean story completion
 func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, config model.ReadinessConfig) {
 	logger.Log(t, "clean requested")
-	provConfig := config.ProvisionConfig
-
-	terraform.Init(t, options)
-
-	Cleanup(t, options)
-	CheckNodesReady(t, kubectlOptions, 0,
-		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
+//	provConfig := config.ProvisionConfig
+//
+//	terraform.Init(t, options)
+//
+//	Cleanup(t, options)
+//
+//	CheckNodesReady(t, kubectlOptions, 0,
+//		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
 }
 
+// TODO - clean story completion
 func apply(t *testing.T, options *terraform.Options, config model.ReadinessConfig) {
-	provConfig := config.ProvisionConfig
+	// provConfig := config.ProvisionConfig
 	terraform.InitAndApply(t, options)
-
-	if provConfig.PreTestCleanup {
-		Cleanup(t, options)
-	}
-	if provConfig.PostTestCleanup {
-		defer Cleanup(t, options)
-	}
+	logger.Log(t, fmt.Sprintf("test artifact name: %s",t.Name()))
+	//if provConfig.PreTestCleanup {
+	//	Cleanup(t, options)
+	//}
+	//if provConfig.PostTestCleanup {
+	//	defer Cleanup(t, options)
+	//}
 }

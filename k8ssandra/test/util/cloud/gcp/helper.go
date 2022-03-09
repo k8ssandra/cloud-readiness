@@ -20,12 +20,8 @@ import (
 	"fmt"
 	_ "github.com/gruntwork-io/terratest/modules/gcp"
 	"github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
-	"github.com/stretchr/testify/require"
-	"os"
-	"path"
 	"testing"
 )
 
@@ -73,44 +69,5 @@ func Switch(t *testing.T, serviceAccount string, env map[string]string) bool {
 		return false
 	}
 	logger.Log(t, fmt.Sprintf("switched to service account: %s", serviceAccount))
-	return true
-}
-
-func ActivateServiceAccount(t *testing.T, env map[string]string, dir string, iamAccountName string) bool {
-	require.NotEmpty(t, dir, "expecting directory to be supplied for service account activation activities")
-	require.NotEmpty(t, iamAccountName, "expecting iam account name to be supplied for service account activation activities")
-
-	fn := path.Join(dir, random.UniqueId()+".json")
-
-	defer os.Remove(fn)
-
-	var args = []string{"iam", "service-accounts", "keys", "create", fn, "--iam-account", iamAccountName}
-	var cmd = shell.Command{
-		Command:    "gcloud",
-		Args:       args,
-		WorkingDir: dir,
-		Env:        env,
-		Logger:     logger.Default,
-	}
-
-	var _, cmdErr = shell.RunCommandAndGetOutputE(t, cmd)
-	if cmdErr != nil {
-		logger.Log(t, fmt.Sprintf("failed service account activation key create: %s", cmdErr))
-		return false
-	}
-
-	args = []string{"auth", "activate-service-account", iamAccountName, "--key-file=" + fn}
-	cmd = shell.Command{
-		Command:    "gcloud",
-		Args:       args,
-		WorkingDir: dir,
-		Env:        env,
-		Logger:     logger.Default,
-	}
-	_, cmdErr = shell.RunCommandAndGetOutputE(t, cmd)
-	if cmdErr != nil {
-		logger.Log(t, fmt.Sprintf("failed service account activation key create: %s", cmdErr))
-		return false
-	}
 	return true
 }

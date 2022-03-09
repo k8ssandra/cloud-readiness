@@ -1,6 +1,8 @@
 #!/bin/sh
-cd /tmp/%1/k8ssandra/provision/gcp/env || exit
-tf plan -destroy -out=destroy-plan
-tf apply destroy-plan
+c1=TestK8cSmoke301164804
+c2=TestK8cSmoke1789200748
+c3=TestK8cSmoke1765091164
 
-
+./delegate.sh $c1 &
+./delegate.sh $c2 &
+./delegate.sh $c3 &

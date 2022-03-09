@@ -29,11 +29,11 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/strings/slices"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,15 +41,24 @@ import (
 
 // Apply based on provision meta and configuration settings
 func Apply(t *testing.T, meta model.ProvisionMeta, k8cReadinessConfig model.ReadinessConfig) {
-	if !meta.Enabled {
-		logger.Log(t, "an infrastructure provisioning is not being referenced, infrastructure provision started ...")
-		meta = ProvisionMultiCluster(t, k8cReadinessConfig)
-		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
-		logger.Log(t, fmt.Sprintf("provision submitted for identifier: %s", meta.ProvisionId))
+
+	if meta.Enabled && meta.RemoveAll {
+		// TODO - use the metadata for where the folders were created.
+		// ArtifactsRootDir
+
+		// /tmp/<test-dirs>
 	} else {
-		logger.Log(t, fmt.Sprintf("found an existing infrastructure to reference, identifier: %s", meta.ProvisionId))
-		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
-		InstallK8ssandra(t, k8cReadinessConfig, meta)
+
+		if !meta.Enabled {
+			logger.Log(t, "an existing infrastructure provisioning is not being referenced, provision will be started ...")
+			meta = ProvisionMultiCluster(t, k8cReadinessConfig, meta)
+			require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
+			logger.Log(t, fmt.Sprintf("provision submitted for identifier: %s", meta.ProvisionId))
+		} else {
+			logger.Log(t, fmt.Sprintf("found an existing infrastructure to reference, identifier: %s", meta.ProvisionId))
+			logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
+			InstallK8ssandra(t, k8cReadinessConfig, meta)
+		}
 	}
 }
 
@@ -98,7 +107,9 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 			cloudConfig.Bucket:        uniqueBucketName,
 		}
 
-		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": cloudConfig.CredPath}
+		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": cloudConfig.CredPath,
+			defaultControlPlaneKey: strconv.FormatBool(IsControlPlane(config.Contexts[name]))}
+
 		options := terraform.Options{
 			TerraformDir: rootFolder,
 			Vars:         vars,
@@ -107,6 +118,10 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 		tfOptions[name] = &options
 	}
 	return tfOptions
+}
+
+func IsControlPlane(ctxConfig model.ContextConfig) bool {
+	return slices.Contains(ctxConfig.ClusterLabels, defaultControlPlaneLabel)
 }
 
 // checkForAllNodes determines if expected number of nodes exist
@@ -140,11 +155,11 @@ func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
 	logger.Log(t, message)
 }
 
-func FetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
+func FetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) ([]byte, error) {
 	logger.Log(t, fmt.Sprintf("obtaining certificate"))
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-n", namespace, "-o", "jsonpath={.data['ca\\.crt']}")
 	require.NoError(t, err)
-	return out
+	return base64.StdEncoding.DecodeString(out)
 }
 
 func FetchToken(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) string {
@@ -162,12 +177,13 @@ func FetchToken(t *testing.T, options *k8s.KubectlOptions, secret string, namesp
 }
 
 func FetchSecret(t *testing.T, options *k8s.KubectlOptions, serviceAccount string, namespace string) string {
-	out, err := k8s.RunKubectlAndGetOutputE(t, options,
-		"get", "serviceaccount", serviceAccount, "-n", namespace, "-o", "jsonpath={.secrets[0].name}")
 
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	return out
+	options.Namespace = namespace
+	sa := k8s.GetServiceAccount(t, options, serviceAccount)
+	require.NotNil(t, sa, fmt.Sprintf("Expecting service account to be available: %s", serviceAccount))
+	secret := sa.Secrets[0].Name
+	require.NotNil(t, secret, fmt.Sprintf("Expecting secret to be availabe for service account: %s", serviceAccount))
+	return secret
 }
 
 func FetchKubeConfigPath(t *testing.T) (string, string) {
@@ -179,31 +195,4 @@ func FetchKubeConfigPath(t *testing.T) (string, string) {
 func FetchEnv(t *testing.T, key string) string {
 	require.NotEmpty(t, key, "expecting key to be defined for fetch env")
 	return os.Getenv(key)
-}
-
-func ExternalizeConfig(t *testing.T, ctxOption model.ContextOption,
-	clientConfig clientcmd.ClientConfig) clientcmd.ClientConfig {
-	raw, err := clientConfig.RawConfig()
-	require.NoError(t, err, "expected client config to contain raw config")
-
-	authInfo := *raw.AuthInfos[ctxOption.FullName]
-	require.NotEmpty(t, authInfo, "expected auth info to be located for user: %s", ctxOption.FullName)
-
-	authInfos := make(map[string]*clientcmdapi.AuthInfo)
-	authInfos = raw.AuthInfos
-	authInfos[ctxOption.FullName] = &clientcmdapi.AuthInfo{
-		AuthProvider: raw.AuthInfos[ctxOption.FullName].AuthProvider,
-		Token:        ctxOption.ServiceAccount.Token,
-	}
-	apiConfig := clientcmdapi.Config{
-		Kind:           "Config",
-		APIVersion:     "v1",
-		Clusters:       raw.Clusters,
-		Contexts:       raw.Contexts,
-		CurrentContext: raw.CurrentContext,
-		AuthInfos:      authInfos,
-	}
-	writeErr := clientcmd.WriteToFile(apiConfig, clientConfig.ConfigAccess().GetExplicitFile())
-	require.NoError(t, writeErr, "expected config write")
-	return k8s.LoadConfigFromPath(clientConfig.ConfigAccess().GetExplicitFile())
 }
