@@ -4,13 +4,17 @@ go 1.16
 
 require (
 	github.com/datastax/go-cassandra-native-protocol v0.0.0-20211124104234-f6aea54fa801
+	github.com/fatih/color v1.13.0 // indirect
+	github.com/goccy/go-yaml v1.9.5 // indirect
 	github.com/gruntwork-io/terratest v0.38.8
 	github.com/k8ssandra/cass-operator v1.9.0
 	github.com/k8ssandra/k8ssandra-operator v1.0.0-alpha.2
 	github.com/k8ssandra/reaper-client-go v0.3.1-0.20210617111910-fe2ba92f8efb
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	gopkg.in/resty.v1 v1.12.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.23.0
