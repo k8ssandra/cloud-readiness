@@ -72,6 +72,7 @@ func InstallK8ssandra(t *testing.T, readinessConfig model.ReadinessConfig, provi
 	}
 
 	// control-plane operator is restarted as part of this operation
+
 	installK8ssandraCluster(t, readinessConfig, ctxOptions)
 
 	// TODO - drive this request from the model
@@ -108,12 +109,19 @@ func installK8ssandraCluster(t *testing.T, readinessConfig model.ReadinessConfig
 		kubeConfig := ctxOptions[name].KubectlOptions
 		setCurrentContext(t, ctxOptions[name].FullName, kubeConfig)
 		if IsControlPlane(ctxConfig) {
+
+			if isK8ssandraClusterExisting(t, kubeConfig, ctxConfig.Namespace) {
+				logger.Log(t, "k8c existing, removing")
+				removeK8ssandraCluster(t, kubeConfig, readinessConfig.ProvisionConfig.K8cConfig.ClusterName, ctxConfig.Namespace)
+				time.Sleep(time.Second * 15)
+			}
+
 			kubeConfig.Env[defaultControlPlaneKey] = "true"
 			logger.Log(t, fmt.Sprintf("=== deploying k8ssandra-cluster on control plane: %s", name))
 			require.Eventually(t, func() bool {
 				endpointIP := waitForEndpoint(t, kubeConfig, defaultK8ssandraOperatorReleaseName+"-"+defaultWebhookServiceName)
-				logger.Log(t, fmt.Sprintf("endpoint returned: %s", endpointIP))
-				return strings.TrimSpace(endpointIP) != ""
+				logger.Log(t, fmt.Sprintf("endpoint discovery on control-plane: %s", endpointIP))
+				return strings.TrimSpace(endpointIP) != "''"
 			}, time.Second*40, defaultInterval, "timeout waiting for endpoint ip to exist")
 
 			time.Sleep(defaultTimeout)
@@ -123,6 +131,13 @@ func installK8ssandraCluster(t *testing.T, readinessConfig model.ReadinessConfig
 			restartOperator(t, ctxConfig.Namespace, kubeConfig)
 		}
 	}
+}
+
+func removeK8ssandraCluster(t *testing.T, kubeConfig *k8s.KubectlOptions, k8ssandraClusterName string, namespace string) {
+	logger.Log(t, "removing k8c already present")
+	out, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "delete", "k8c", k8ssandraClusterName, "-n", namespace)
+	require.NoError(t, err)
+	logger.Log(t, out)
 }
 
 func restartK8ssandraDataPlaneOperators(t *testing.T, readinessConfig model.ReadinessConfig, ctxOptions map[string]model.ContextOption) {
@@ -138,6 +153,12 @@ func restartK8ssandraDataPlaneOperators(t *testing.T, readinessConfig model.Read
 			time.Sleep(time.Second * 30)
 		}
 	}
+}
+
+func isK8ssandraClusterExisting(t *testing.T, options *k8s.KubectlOptions, namespace string) bool {
+
+	k8c, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "k8c", "-n", namespace, "-o", "name")
+	return err == nil && k8c != ""
 }
 
 func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string,

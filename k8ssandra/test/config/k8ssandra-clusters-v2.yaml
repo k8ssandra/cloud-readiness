@@ -8,24 +8,24 @@ spec:
     serverVersion: "4.0.1"
     storageConfig:
       cassandraDataVolumeClaimSpec:
-        storageClassName: premium-rwo
+        storageClassName: standard-rwo
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 5Gi
+            storage: 10Gi
     config:
       jvmOptions:
-        heapSize: 1024Mi
+        heapSize: 2048Mi
     datacenters:
       - metadata:
           name: dc1
-        k8sContext: gke_community-ecosystem_us-central1_dev-bootz601
-        size: 3
+        k8sContext: gke_community-ecosystem_us-central1_dev-bootz801
+        size: 1
       - metadata:
           name: dc2
-        k8sContext: gke_community-ecosystem_us-central1_dev-bootz602
-        size: 3
+        k8sContext: gke_community-ecosystem_us-central1_dev-bootz802
+        size: 1
   stargate:
     size: 1
     heapSize: 1024Mi
