@@ -47,6 +47,7 @@ type K8cConfig struct {
 	MedusaSecretFromFile    string `json:"medusa_secret_from_file,omitempty"`
 	ValuesFilePath          string `json:"values_file_path,omitempty"`
 	ClusterScoped           bool   `json:"cluster_scoped,omitempty"`
+	ClusterName				string `json:"cluster_name"`
 }
 
 type ProvisionConfig struct {

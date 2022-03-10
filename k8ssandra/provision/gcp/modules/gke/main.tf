@@ -20,6 +20,7 @@ resource "google_container_cluster" "container_cluster" {
   location                 = var.region
   remove_default_node_pool = true
   initial_node_count       = var.initial_node_count
+  enable_shielded_nodes    = true
 
   # VPC and Sub-network self links. 
   network    = var.network_link
@@ -42,7 +43,7 @@ resource "google_container_cluster" "container_cluster" {
     enable_private_nodes    = var.enable_private_nodes
   }
 
-  # Resource lables
+  # Resource labels
   resource_labels = {
     environment = format("%s", var.environment)
   }
@@ -54,7 +55,7 @@ resource "google_container_cluster" "container_cluster" {
     }
   }
 
-  # Provisioner to connect the GEK cluster. 
+  # Provisioner to connect the GKE cluster.
   provisioner "local-exec" {
     command = format("gcloud container clusters get-credentials %s --region %s --project %s", google_container_cluster.container_cluster.name, google_container_cluster.container_cluster.location, var.project_id)
   }

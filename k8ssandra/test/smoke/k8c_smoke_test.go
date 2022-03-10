@@ -26,16 +26,17 @@ import (
 )
 
 func TestK8cSmoke(t *testing.T) {
+
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 
 	// Enable to utilize an existing set of cloud infrastructure artifacts already existing.
 	// The ProvisionId and ArtifactsRootDir must be supplied with accurate information.
 	// When not-enabled, will provision fresh cloud infrastructure based on model values.
 	var provisionMeta = ProvisionMeta{
-		Enabled:           false,
+		Enabled:           true,
 		RemoveAll:         false,
-		ProvisionId:       "k8c-qFmR3V",
-		ArtifactsRootDir:  "/tmp/cloud-k8c-qFmR3V",
+		ProvisionId:       "k8c-qxgoFP",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-qxgoFP",
 		KubeConfigs:       nil,
 		ServiceAccount:    "",
 		DefaultConfigPath: configPath,
@@ -58,6 +59,7 @@ func TestK8cSmoke(t *testing.T) {
 		MedusaSecretName:        "dev-k8ssandra-medusa-key",
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
+		ClusterName:             "bootz-k8c-cluster",
 		ValuesFilePath:          "k8ssandra-clusters-v2.yaml",
 		ClusterScoped:           false,
 	}
@@ -85,19 +87,19 @@ func TestK8cSmoke(t *testing.T) {
 	}
 
 	ctxConfig1 := ContextConfig{
-		Name:          "bootz600",
+		Name:          "bootz800",
 		Namespace:     "bootz",
 		ClusterLabels: []string{"control-plane"},
 	}
 
 	ctxConfig2 := ContextConfig{
-		Name:          "bootz601",
+		Name:          "bootz801",
 		Namespace:     "bootz",
 		ClusterLabels: []string{"data-plane"},
 	}
 
 	ctxConfig3 := ContextConfig{
-		Name:          "bootz602",
+		Name:          "bootz802",
 		Namespace:     "bootz",
 		ClusterLabels: []string{"data-plane"},
 	}
