@@ -47,7 +47,7 @@ type K8cConfig struct {
 	MedusaSecretFromFile    string `json:"medusa_secret_from_file,omitempty"`
 	ValuesFilePath          string `json:"values_file_path,omitempty"`
 	ClusterScoped           bool   `json:"cluster_scoped,omitempty"`
-	ClusterName				string `json:"cluster_name"`
+	ClusterName             string `json:"cluster_name"`
 }
 
 type ProvisionConfig struct {
@@ -78,6 +78,7 @@ type ContextOption struct {
 	ShortName      string                 `json:"short_name" yaml:"short_name"`
 	FullName       string                 `json:"full_name,omitempty" yaml:"full_name,omitempty"`
 	KubectlOptions *k8s.KubectlOptions    `json:"kubectl_options,omitempty"`
+	AdminOptions   *k8s.KubectlOptions    `json:"admin_options, omitempty"`
 	ServiceAccount *ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
 	ServerAddress  string                 `json:"server_address" yaml:"server_address,omitempty"`
 	ProvisionMeta  ProvisionMeta          `json:"provision_meta" yaml:"provision_meta"`
