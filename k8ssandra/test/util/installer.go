@@ -58,18 +58,18 @@ func InstallK8ssandra(t *testing.T, readinessConfig model.ReadinessConfig, provi
 
 	ctxOptions := preconditions(t, readinessConfig, provisionMeta)
 
-	installControlPlaneOperator(t, readinessConfig, ctxOptions)
-
-	installDataPlaneOperators(t, readinessConfig, ctxOptions)
-
-	createClientConfigurations(t, readinessConfig, ctxOptions)
-
 	// todo - separate function
 	logger.Log(t, "creating kube configurations per cluster")
 	for name := range readinessConfig.Contexts {
 		kubeConfig := createConfig(t, ctxOptions[name])
 		*(ctxOptions[name].KubectlOptions) = *kubeConfig
 	}
+
+	installControlPlaneOperator(t, readinessConfig, ctxOptions)
+
+	installDataPlaneOperators(t, readinessConfig, ctxOptions)
+
+	createClientConfigurations(t, readinessConfig, ctxOptions)
 
 	// control-plane operator is restarted as part of this operation
 
@@ -230,7 +230,7 @@ func createClientConfigurations(t *testing.T, readinessConfig model.ReadinessCon
 
 	for name, ctxConfig := range readinessConfig.Contexts {
 
-		adminKubeConfig = ctxOptions[name].KubectlOptions
+		adminKubeConfig = ctxOptions[name].AdminOptions
 		setCurrentContext(t, ctxOptions[name].FullName, adminKubeConfig)
 
 		addServiceAccount(t, ctxOptions[name], ctxConfig.Namespace, adminKubeConfig)
@@ -242,15 +242,15 @@ func createClientConfigurations(t *testing.T, readinessConfig model.ReadinessCon
 
 	logger.Log(t, "creating the generic secret ...")
 	for name, ctxConfig := range readinessConfig.Contexts {
-		adminKubeConfig = ctxOptions[name].KubectlOptions
+		adminKubeConfig = ctxOptions[name].AdminOptions
 		createGenericSecret(t, ctxConfig.Namespace, adminKubeConfig)
 	}
 
 	// Apply generated client configs for each cluster.
 	for name, ctxConfig := range readinessConfig.Contexts {
 		for _, gcc := range generatedClientConfigs {
-			setCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].KubectlOptions)
-			applyClientConfig(t, ctxOptions[name].KubectlOptions, gcc, ctxConfig.Namespace)
+			setCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].AdminOptions)
+			applyClientConfig(t, ctxOptions[name].AdminOptions, gcc, ctxConfig.Namespace)
 		}
 	}
 }
@@ -546,6 +546,7 @@ func createContextOptions(t *testing.T, readinessConfig model.ReadinessConfig,
 			ShortName:      name,
 			FullName:       fullName,
 			KubectlOptions: configs[name],
+			AdminOptions:   configs[name],
 			ServiceAccount: &model.ContextServiceAccount{Name: saName, Namespace: ctx.Namespace,
 				Cert: kubeCluster.CertificateAuthorityData},
 			ServerAddress: kubeCluster.Server,

@@ -41,4 +41,5 @@ website/vendor
 *.winfile eol=crlf
 
 # Local test file
-k8ssandra/test/smoke/k8c_smoke_test.go
+/k8ssandra/test/smoke/k8c_smoke_test.go
+/k8ssandra/test/util/scripts/clean.sh
