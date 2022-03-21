@@ -74,6 +74,7 @@ func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber i
 
 // CreateOptions constructs Terraform options, which include kubeConfig path.
 // Names for cluster, service account, and buckets are made to be specific based on the ID provided.
+// Used for provisioning with
 func CreateOptions(config model.ReadinessConfig, rootFolder string,
 	kubeConfigPath string) map[string]*terraform.Options {
 
@@ -84,7 +85,8 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 	for name := range config.Contexts {
 
 		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" + config.ServiceAccountNameSuffix + defaultIdentityDomain
+		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" +
+			config.ServiceAccountNameSuffix + defaultIdentityDomain
 		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
 
 		vars := map[string]interface{}{
@@ -195,4 +197,15 @@ func FetchKubeConfigPath(t *testing.T) (string, string) {
 func FetchEnv(t *testing.T, key string) string {
 	require.NotEmpty(t, key, "expecting key to be defined for fetch env")
 	return os.Getenv(key)
+}
+
+func DeleteResource(t *testing.T, kubeConfig *k8s.KubectlOptions, resourceKind string, resourceName string) {
+
+	require.NotEmpty(t, resourceKind, "required resource kind to be specified for delete")
+	require.NotEmpty(t, resourceName, "required resource name to be specified for delete")
+	_, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "delete", resourceKind, resourceName)
+	if err != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: attempt to delete resource of kind: %s "+
+			"and name: %s failed: %s", resourceKind, resourceName, err.Error()))
+	}
 }

@@ -44,26 +44,20 @@ const (
 	defaultTimeout      = time.Second * 5
 	defaultInterval     = time.Millisecond * 250
 
-	defaultK8ssandraSecret    = "k8s-contexts"
-	defaultIdentityDomain     = "@community-ecosystem.iam.gserviceaccount.com"
-	defaultControlPlaneKey    = "K8SSANDRA_CONTROL_PLANE"
-	defaultWebhookServiceName = "webhook-service"
-	defaultControlPlaneLabel  = "control-plane"
-	defaultKubeConfigFileExt  = "-kubeconfig"
+	defaultK8ssandraSecret     = "k8s-contexts"
+	defaultIdentityDomain      = "@community-ecosystem.iam.gserviceaccount.com"
+	defaultControlPlaneKey     = "K8SSANDRA_CONTROL_PLANE"
+	defaultWebhookServiceName  = "webhook-service"
+	defaultControlPlaneLabel   = "control-plane"
+	defaultKubeConfigFileName  = "kubeconfig"
+	defaultTraefikResourceName = "traefik"
 )
 
 func InstallK8ssandra(t *testing.T, readinessConfig model.ReadinessConfig, provisionMeta model.ProvisionMeta) {
 
-	logger.Log(t, "\n\n=== installation started for k8ssandra")
+	logger.Log(t, "\n\nK8ssandra: installations started")
 
 	ctxOptions := preconditions(t, readinessConfig, provisionMeta)
-
-	// todo - separate function
-	logger.Log(t, "creating kube configurations per cluster")
-	for name := range readinessConfig.Contexts {
-		kubeConfig := createConfig(t, ctxOptions[name])
-		*(ctxOptions[name].KubectlOptions) = *kubeConfig
-	}
 
 	installControlPlaneOperator(t, readinessConfig, ctxOptions)
 
@@ -71,19 +65,12 @@ func InstallK8ssandra(t *testing.T, readinessConfig model.ReadinessConfig, provi
 
 	createClientConfigurations(t, readinessConfig, ctxOptions)
 
-	// control-plane operator is restarted as part of this operation
-
 	installK8ssandraCluster(t, readinessConfig, ctxOptions)
 
-	// TODO - drive this request from the model
-	isRestartAllRequested := true
-	if isRestartAllRequested {
-		restartK8ssandraDataPlaneOperators(t, readinessConfig, ctxOptions)
-	}
 }
 
 func installDataPlaneOperators(t *testing.T, readinessConfig model.ReadinessConfig, ctxOptions map[string]model.ContextOption) {
-	logger.Log(t, "\n\n=== installing k8ssandra data-plane(s)")
+	logger.Log(t, "\n\nK8ssandra: installation of data-plane")
 	var isClusterScoped = readinessConfig.ProvisionConfig.K8cConfig.ClusterScoped
 	for name, ctxConfig := range readinessConfig.Contexts {
 		kubeConfig := ctxOptions[name].KubectlOptions
@@ -104,61 +91,36 @@ func installDataPlaneOperators(t *testing.T, readinessConfig model.ReadinessConf
 func installK8ssandraCluster(t *testing.T, readinessConfig model.ReadinessConfig,
 	ctxOptions map[string]model.ContextOption) {
 
-	logger.Log(t, "\n\n===installing k8ssandra cluster")
+	logger.Log(t, "\n\nK8ssandra: installation of cluster")
 	for name, ctxConfig := range readinessConfig.Contexts {
 		kubeConfig := ctxOptions[name].KubectlOptions
 		setCurrentContext(t, ctxOptions[name].FullName, kubeConfig)
+
 		if IsControlPlane(ctxConfig) {
 
-			if isK8ssandraClusterExisting(t, kubeConfig, ctxConfig.Namespace) {
-				logger.Log(t, "k8c existing, removing")
-				removeK8ssandraCluster(t, kubeConfig, readinessConfig.ProvisionConfig.K8cConfig.ClusterName, ctxConfig.Namespace)
-				time.Sleep(time.Second * 15)
-			}
+			// todo - address timing and re-install of this ....
+			//if isK8ssandraClusterExisting(t, kubeConfig, ctxConfig.Namespace) {
+			//	logger.Log(t, "k8c existing, removing")
+			//	removeK8ssandraCluster(t, kubeConfig, readinessConfig.ProvisionConfig.K8cConfig.ClusterName, ctxConfig.Namespace)
+			//	time.Sleep(time.Second * 15)
+			//}
 
 			kubeConfig.Env[defaultControlPlaneKey] = "true"
+
 			logger.Log(t, fmt.Sprintf("=== deploying k8ssandra-cluster on control plane: %s", name))
 			require.Eventually(t, func() bool {
 				endpointIP := waitForEndpoint(t, kubeConfig, defaultK8ssandraOperatorReleaseName+"-"+defaultWebhookServiceName)
-				logger.Log(t, fmt.Sprintf("endpoint discovery on control-plane: %s", endpointIP))
+				// logger.Log(t, fmt.Sprintf("endpoint discovery on control-plane: %s", endpointIP))
 				return strings.TrimSpace(endpointIP) != "''"
-			}, time.Second*40, defaultInterval, "timeout waiting for endpoint ip to exist")
+			}, time.Second*30, defaultInterval, "timeout waiting for endpoint ip to exist")
 
-			time.Sleep(defaultTimeout)
+			logger.Log(t, "\n\nK8ssandra: control-plane k8c cluster deployment underway ...")
+
 			deployK8ssandraCluster(t, readinessConfig, ctxConfig.Name, kubeConfig, ctxConfig.Namespace)
 
-			time.Sleep(time.Second * 30)
-			restartOperator(t, ctxConfig.Namespace, kubeConfig)
+			time.Sleep(defaultTimeout * 6)
 		}
 	}
-}
-
-func removeK8ssandraCluster(t *testing.T, kubeConfig *k8s.KubectlOptions, k8ssandraClusterName string, namespace string) {
-	logger.Log(t, "removing k8c already present")
-	out, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "delete", "k8c", k8ssandraClusterName, "-n", namespace)
-	require.NoError(t, err)
-	logger.Log(t, out)
-}
-
-func restartK8ssandraDataPlaneOperators(t *testing.T, readinessConfig model.ReadinessConfig, ctxOptions map[string]model.ContextOption) {
-
-	logger.Log(t, "\n\n===restarting k8ssandra data-plane operators")
-	for name, ctxConfig := range readinessConfig.Contexts {
-		if !IsControlPlane(ctxConfig) {
-			kubeConfig := ctxOptions[name].KubectlOptions
-			setCurrentContext(t, ctxOptions[name].FullName, kubeConfig)
-			kubeConfig.Env[defaultControlPlaneKey] = "false"
-			logger.Log(t, fmt.Sprintf("=== restarting operator on data-plane: %s", name))
-			restartOperator(t, ctxConfig.Namespace, kubeConfig)
-			time.Sleep(time.Second * 30)
-		}
-	}
-}
-
-func isK8ssandraClusterExisting(t *testing.T, options *k8s.KubectlOptions, namespace string) bool {
-
-	k8c, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "k8c", "-n", namespace, "-o", "name")
-	return err == nil && k8c != ""
 }
 
 func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextName string,
@@ -174,10 +136,46 @@ func deployK8ssandraCluster(t *testing.T, config model.ReadinessConfig, contextN
 }
 
 func restartOperator(t *testing.T, namespace string, options *k8s.KubectlOptions) {
-	logger.Log(t, "\n\n\n===restarting k8ssandra-operator")
-	_, err := k8s.RunKubectlAndGetOutputE(t, options, "rollout", "restart",
+	logger.Log(t, "\n\nK8ssandra: restarting k8ssandra-operator")
+
+	pod, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod",
+		"-l", "app.kubernetes.io/name=k8ssandra-operator", "-n", namespace, "-o", "name")
+
+	if err == nil && pod != "" {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "pod",
+			pod, "-n", namespace)
+
+		if err != nil {
+			logger.Log(t, fmt.Sprintf("WARNING: attempt to delete pod: %s failed due to: %s", pod, err))
+		}
+	}
+
+	_, err2 := k8s.RunKubectlAndGetOutputE(t, options, "rollout", "restart",
 		"deployment", defaultK8ssandraOperatorReleaseName, "-n", namespace)
-	require.NoError(t, err)
+	require.NoError(t, err2)
+	time.Sleep(defaultTimeout)
+}
+
+func restartCassOperator(t *testing.T, namespace string, options *k8s.KubectlOptions) {
+
+	logger.Log(t, "\n\nK8ssandra: restarting k8ssandra-cass-operator")
+
+	// k get pods -n bootz -l app.kubernetes.io/name=cass-operator -o name
+	pod, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod",
+		"-l", "app.kubernetes.io/name=cass-operator", "-n", namespace, "-o", "name")
+
+	if err == nil && pod != "" {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "pod",
+			pod, "-n", namespace)
+
+		if err != nil {
+			logger.Log(t, fmt.Sprintf("WARNING: attempt to delete pod: %s failed due to: %s", pod, err))
+		}
+	}
+
+	_, err2 := k8s.RunKubectlAndGetOutputE(t, options, "rollout", "restart",
+		"deployment", defaultCassandraOperatorName, "-n", namespace)
+	require.NoError(t, err2)
 	time.Sleep(defaultTimeout)
 }
 
@@ -190,7 +188,7 @@ func waitForEndpoint(t *testing.T, kubeConfig *k8s.KubectlOptions, name string) 
 func installControlPlaneOperator(t *testing.T, readinessConfig model.ReadinessConfig,
 	ctxOptions map[string]model.ContextOption) string {
 
-	logger.Log(t, "\n\n===installing k8ssandra control-plane")
+	logger.Log(t, "\n\nK8ssandra: installing control-plane")
 	var isClusterScoped = readinessConfig.ProvisionConfig.K8cConfig.ClusterScoped
 	var controlPlaneContextName = ""
 
@@ -202,6 +200,9 @@ func installControlPlaneOperator(t *testing.T, readinessConfig model.ReadinessCo
 		if isControlPlane {
 			setEnvErr := os.Setenv(defaultControlPlaneKey, strconv.FormatBool(isControlPlane))
 			require.NoError(t, setEnvErr)
+
+			// todo -
+			// set a label on the pod -- control-plane: k8ssandra-operator
 
 			t.Setenv(defaultControlPlaneKey, strconv.FormatBool(isControlPlane))
 			kubeConfig.Env[defaultControlPlaneKey] = strconv.FormatBool(isControlPlane)
@@ -223,35 +224,43 @@ func installControlPlaneOperator(t *testing.T, readinessConfig model.ReadinessCo
 
 func createClientConfigurations(t *testing.T, readinessConfig model.ReadinessConfig,
 	ctxOptions map[string]model.ContextOption) {
-	logger.Log(t, "\n\n===creating client configurations")
+	logger.Log(t, "\n\nK8ssandra: creating client configurations")
 
 	var generatedClientConfigs []string
-	var adminKubeConfig *k8s.KubectlOptions
+	var kubeConfig *k8s.KubectlOptions
 
 	for name, ctxConfig := range readinessConfig.Contexts {
 
-		adminKubeConfig = ctxOptions[name].AdminOptions
-		setCurrentContext(t, ctxOptions[name].FullName, adminKubeConfig)
+		kubeConfig = ctxOptions[name].KubectlOptions
+		setCurrentContext(t, ctxOptions[name].FullName, kubeConfig)
 
-		addServiceAccount(t, ctxOptions[name], ctxConfig.Namespace, adminKubeConfig)
+		addServiceAccount(t, ctxOptions[name], ctxConfig.Namespace, kubeConfig)
 		setupTestArtifactDirectory(t, ctxOptions[name])
 
 		generatedClientConfig := generateClientConfig(t, ctxOptions[name])
 		generatedClientConfigs = append(generatedClientConfigs, generatedClientConfig)
 	}
 
-	logger.Log(t, "creating the generic secret ...")
+	createConfigs(t, ctxOptions, readinessConfig)
+
+	logger.Log(t, "\n\nK8ssandra: Creating the generic secret ...")
 	for name, ctxConfig := range readinessConfig.Contexts {
-		adminKubeConfig = ctxOptions[name].AdminOptions
-		createGenericSecret(t, ctxConfig.Namespace, adminKubeConfig)
+		kubeConfig = ctxOptions[name].KubectlOptions
+		createGenericSecret(t, ctxConfig.Namespace, kubeConfig)
 	}
 
 	// Apply generated client configs for each cluster.
 	for name, ctxConfig := range readinessConfig.Contexts {
 		for _, gcc := range generatedClientConfigs {
-			setCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].AdminOptions)
-			applyClientConfig(t, ctxOptions[name].AdminOptions, gcc, ctxConfig.Namespace)
+			setCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].KubectlOptions)
+			applyClientConfig(t, ctxOptions[name].KubectlOptions, gcc, ctxConfig.Namespace)
 		}
+	}
+
+	// delete pods, then perform a rollout restart of the operators.
+	for name, ctxConfig := range readinessConfig.Contexts {
+		restartOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
+		restartCassOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
 	}
 }
 
@@ -263,55 +272,74 @@ func setupTestArtifactDirectory(t *testing.T, ctxOption model.ContextOption) {
 		"root path: %s", rootPath))
 }
 
-func createConfig(t *testing.T, ctxOption model.ContextOption) *k8s.KubectlOptions {
+func createConfigs(t *testing.T, ctxOptions map[string]model.ContextOption, readinessConfig model.ReadinessConfig) {
 
-	var cluster = v1.Cluster{
-		Server:                   ctxOption.ServerAddress,
-		InsecureSkipTLSVerify:    false,
-		CertificateAuthorityData: ctxOption.ServiceAccount.Cert,
+	var clusters []v1.NamedCluster
+	var auths []v1.NamedAuthInfo
+	var namedContexts []v1.NamedContext
+	var currentContext string
+
+	for name := range readinessConfig.Contexts {
+		ctxOption := ctxOptions[name]
+
+		var cluster = v1.Cluster{
+			Server:                   ctxOption.ServerAddress,
+			InsecureSkipTLSVerify:    false,
+			CertificateAuthorityData: ctxOption.ServiceAccount.Cert,
+		}
+
+		var namedCluster = v1.NamedCluster{
+			Name:    ctxOption.FullName,
+			Cluster: cluster,
+		}
+		clusters = append(clusters, namedCluster)
+
+		var authInfo = v1.AuthInfo{
+			Token: ctxOption.ServiceAccount.Token,
+		}
+
+		userName := ctxOption.FullName
+		var namedAuthInfo = v1.NamedAuthInfo{
+			Name:     userName,
+			AuthInfo: authInfo,
+		}
+		auths = append(auths, namedAuthInfo)
+
+		var context = v1.Context{
+			Cluster:  ctxOption.FullName,
+			AuthInfo: namedAuthInfo.Name,
+		}
+
+		if IsControlPlane(readinessConfig.Contexts[name]) {
+			currentContext = ctxOption.FullName
+		}
+
+		var namedContext = v1.NamedContext{
+			Name:    userName,
+			Context: context,
+		}
+		namedContexts = append(namedContexts, namedContext)
 	}
 
-	var namedCluster = v1.NamedCluster{
-		Name:    ctxOption.FullName,
-		Cluster: cluster,
-	}
-
-	var clusters = []v1.NamedCluster{namedCluster}
-
-	var authInfo = v1.AuthInfo{
-		Token: ctxOption.ServiceAccount.Token,
-	}
-
-	userName := ctxOption.FullName
-	var namedAuthInfo = v1.NamedAuthInfo{
-		Name:     userName,
-		AuthInfo: authInfo,
-	}
-	var auths = []v1.NamedAuthInfo{namedAuthInfo}
-
-	var context = v1.Context{
-		Cluster:  ctxOption.FullName,
-		AuthInfo: namedAuthInfo.Name,
-	}
-	var namedContext = v1.NamedContext{
-		Name:    userName,
-		Context: context,
-	}
-
-	var contexts = []v1.NamedContext{namedContext}
 	var cfg = v1.Config{
 		Kind:           "Config",
 		APIVersion:     "v1",
 		Preferences:    v1.Preferences{},
 		Clusters:       clusters,
 		AuthInfos:      auths,
-		Contexts:       contexts,
-		CurrentContext: ctxOption.FullName,
+		Contexts:       namedContexts,
+		CurrentContext: currentContext,
 		Extensions:     nil,
 	}
 
-	absolutePath := writeKubeConfig(t, ctxOption, cfg)
-	return k8s.NewKubectlOptions(ctxOption.FullName, absolutePath, ctxOption.ServiceAccount.Namespace)
+	for name := range ctxOptions {
+		ctxOption := ctxOptions[name]
+		absolutePath := writeKubeConfig(t, ctxOption, cfg)
+		kubeConfig := k8s.NewKubectlOptions(ctxOption.FullName, absolutePath, ctxOption.ServiceAccount.Namespace)
+
+		*(ctxOptions[name].KubectlOptions) = *kubeConfig
+		logger.Log(t, fmt.Sprintf("Assigned ctx name: %s to kube config ctx: %s @ %s", name, kubeConfig.ContextName, kubeConfig.ConfigPath))
+	}
 
 }
 
@@ -348,7 +376,16 @@ func configRootPath(t *testing.T, contextOption model.ContextOption, fileName st
 	if fileName != "" {
 		return path.Join(rootPath, fileName)
 	}
-	logger.Log(t, fmt.Sprintf("config root path: %s", rootPath))
+	logger.Log(t, fmt.Sprintf("cloud temp context-specific root path: %s", rootPath))
+	return rootPath
+}
+
+func configCloudTempRootPath(t *testing.T, contextOption model.ContextOption, fileName string) string {
+	rootPath := contextOption.ProvisionMeta.ArtifactsRootDir
+	if fileName != "" {
+		return path.Join(rootPath, fileName)
+	}
+	logger.Log(t, fmt.Sprintf("cloud temp root path: %s", rootPath))
 	return rootPath
 }
 
@@ -416,8 +453,8 @@ func writeKubeConfig(t *testing.T, ctxOption model.ContextOption, clientConfig v
 		logger.Log(t, marshalError.Error())
 	}
 
-	fileName := ctxOption.ShortName + defaultKubeConfigFileExt
-	absoluteFilePath := configRootPath(t, ctxOption, fileName)
+	fileName := defaultKubeConfigFileName
+	absoluteFilePath := configCloudTempRootPath(t, ctxOption, fileName)
 
 	if files.FileExists(absoluteFilePath) {
 		err := os.Remove(absoluteFilePath)
@@ -434,18 +471,20 @@ func writeKubeConfig(t *testing.T, ctxOption model.ContextOption, clientConfig v
 }
 
 func addServiceAccount(t *testing.T, ctxOption model.ContextOption, namespace string,
-	adminKubeConfig *k8s.KubectlOptions) {
+	kubeConfig *k8s.KubectlOptions) {
 
 	logger.Log(t, fmt.Sprintf("adding service account:%s to context using ns:%s", defaultK8ssandraOperatorReleaseName, namespace))
-	adminKubeConfig.Namespace = namespace
+
+	kubeConfig.Namespace = namespace
 	csa := model.ContextServiceAccount{}
 	csa.Namespace = namespace
 
-	csa.Secret = FetchSecret(t, adminKubeConfig, defaultK8ssandraOperatorReleaseName, namespace)
-	csa.Token = FetchToken(t, adminKubeConfig, csa.Secret, namespace)
-	csa.Cert, _ = FetchCertificate(t, adminKubeConfig, csa.Secret, namespace)
+	csa.Secret = FetchSecret(t, kubeConfig, defaultK8ssandraOperatorReleaseName, namespace)
+	csa.Token = FetchToken(t, kubeConfig, csa.Secret, namespace)
+	csa.Cert, _ = FetchCertificate(t, kubeConfig, csa.Secret, namespace)
+
 	require.NotEmpty(t, csa.Cert, "Expected certificate data available for secret")
-	(*ctxOption.ServiceAccount) = csa
+	*ctxOption.ServiceAccount = csa
 
 	logger.Log(t, fmt.Sprintf("certificate and token obtained for secret:%s", csa.Secret))
 }
@@ -469,8 +508,8 @@ func installCertManager(t *testing.T, options *k8s.KubectlOptions) {
 }
 
 func installK8ssandraOperator(t *testing.T, options *helm.Options, contextName string, namespace string, isClusterScoped bool) {
-	logger.Log(t, fmt.Sprintf("installing [k8ssandra-operator] "+
-		"for context: [%s] and namespace: [%s]", contextName, namespace))
+	logger.Log(t, fmt.Sprintf("installing k8ssandra-operator "+
+		"for context: %s and namespace: %s", contextName, namespace))
 	logger.Log(t, fmt.Sprintf("cluster scoped for k8ssandra-operator is set as: %s",
 		strconv.FormatBool(isClusterScoped)))
 
@@ -508,6 +547,7 @@ func preconditions(t *testing.T, readinessConfig model.ReadinessConfig,
 
 		kubeConfig := k8s.NewKubectlOptions(fullName, provisionMeta.DefaultConfigPath,
 			readinessConfig.Contexts[name].Namespace)
+
 		setCurrentContext(t, fullName, kubeConfig)
 
 		helmOptions := createHelmOptions(kubeConfig, map[string]string{}, map[string]string{})
@@ -516,8 +556,12 @@ func preconditions(t *testing.T, readinessConfig model.ReadinessConfig,
 		}
 
 		installCertManager(t, kubeConfig)
+
 		contextConfigs[name] = kubeConfig
+
+		installTraefik(t, helmOptions, readinessConfig.Contexts[name])
 	}
+
 	return createContextOptions(t, readinessConfig, provisionMeta, contextConfigs)
 }
 
@@ -567,4 +611,56 @@ func selectClusterFromKube(t *testing.T, name string, configs map[string]*k8s.Ku
 		}
 	}
 	return nil
+}
+
+func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
+	logger.Log(t, "setting up repository entries")
+
+	rse1 := helm.RemoveRepoE(t, helmOptions, defaultCertManagerRepositoryName)
+	if rse1 != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: failure encountered during attempted repo removal. %s", rse1.Error()))
+	}
+	helm.AddRepo(t, helmOptions, defaultCertManagerRepositoryName, defaultCertManagerRepositoryURL)
+
+	rse2 := helm.RemoveRepoE(t, helmOptions, defaultK8ssandraRepositoryName)
+	if rse2 != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: failure encountered during attempted repo removal. %s", rse2.Error()))
+	}
+	helm.AddRepo(t, helmOptions, defaultK8ssandraRepositoryName, defaultK8ssandraRepositoryURL)
+
+	rse3 := helm.RemoveRepoE(t, helmOptions, defaultTraefikRepositoryName)
+	if rse3 != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: failure encountered during attempted repo removal. %s", rse3.Error()))
+	}
+	helm.AddRepo(t, helmOptions, defaultTraefikRepositoryName, defaultTraefikRepositoryURL)
+
+	_, err := helm.RunHelmCommandAndGetStdOutE(t, helmOptions, "repo", "update")
+
+	require.NoError(t, err)
+	return true
+}
+
+func installTraefik(t *testing.T, helmOptions *helm.Options, config model.ContextConfig) {
+
+	require.NotNil(t, helmOptions, "expecting helm options to install traefik")
+	require.NotNil(t, config, "expecting readiness config to install traefik")
+
+	DeleteResource(t, helmOptions.KubectlOptions, "ClusterRoleBinding", defaultTraefikResourceName)
+	DeleteResource(t, helmOptions.KubectlOptions, "ClusterRole", defaultTraefikResourceName)
+
+	uninstallTraefik(t, helmOptions)
+
+	_, err := helm.RunHelmCommandAndGetStdOutE(t, helmOptions, "install", defaultTraefikRepositoryName,
+		defaultTraefikChartName, "--version", config.NetworkConfig.TraefikVersion, "-f",
+		path.Join("../config/", config.NetworkConfig.TraefikValuesFile))
+
+	require.NoError(t, err, "expecting that traefik can be installed")
+}
+
+func uninstallTraefik(t *testing.T, helmOptions *helm.Options) {
+
+	_, err := helm.RunHelmCommandAndGetStdOutE(t, helmOptions, "uninstall", defaultTraefikRepositoryName)
+	if err != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: failure encountered during attempted traefik uninstall. %s", err.Error()))
+	}
 }

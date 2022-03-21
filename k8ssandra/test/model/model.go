@@ -1,5 +1,10 @@
 package model
 
+import (
+	"github.com/gruntwork-io/terratest/modules/k8s"
+	corev1 "k8s.io/api/core/v1"
+)
+
 /**
 Copyright 2022 DataStax, Inc.
 
@@ -15,11 +20,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 **/
-
-import (
-	"github.com/gruntwork-io/terratest/modules/k8s"
-	corev1 "k8s.io/api/core/v1"
-)
 
 type CloudConfig struct {
 	Type        string `json:"type,omitempty"`
@@ -47,7 +47,12 @@ type K8cConfig struct {
 	MedusaSecretFromFile    string `json:"medusa_secret_from_file,omitempty"`
 	ValuesFilePath          string `json:"values_file_path,omitempty"`
 	ClusterScoped           bool   `json:"cluster_scoped,omitempty"`
-	ClusterName             string `json:"cluster_name"`
+	ClusterName             string `json:"cluster_name,omitempty"`
+}
+
+type NetworkConfig struct {
+	TraefikValuesFile string `json:"traefik_values_file,omitempty"`
+	TraefikVersion    string `json:"traefik_version"`
 }
 
 type ProvisionConfig struct {
@@ -72,13 +77,14 @@ type ContextConfig struct {
 	Name          string   `json:"name,omitempty"`
 	Namespace     string   `json:"namespace,omitempty"`
 	ClusterLabels []string `json:"cluster_labels,omitempty"`
+	NetworkConfig            NetworkConfig `json:"network_config,omitempty"`
 }
 
 type ContextOption struct {
 	ShortName      string                 `json:"short_name" yaml:"short_name"`
 	FullName       string                 `json:"full_name,omitempty" yaml:"full_name,omitempty"`
 	KubectlOptions *k8s.KubectlOptions    `json:"kubectl_options,omitempty"`
-	AdminOptions   *k8s.KubectlOptions    `json:"admin_options, omitempty"`
+	AdminOptions   *k8s.KubectlOptions    `json:"admin_options,omitempty"`
 	ServiceAccount *ContextServiceAccount `json:"service_account" yaml:"service_account,omitempty"`
 	ServerAddress  string                 `json:"server_address" yaml:"server_address,omitempty"`
 	ProvisionMeta  ProvisionMeta          `json:"provision_meta" yaml:"provision_meta"`

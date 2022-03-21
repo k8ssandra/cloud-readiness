@@ -106,6 +106,11 @@ variable "service_account_iam_roles" {
     "roles/monitoring.metricWriter",
     "roles/monitoring.viewer",
     "roles/stackdriver.resourceMetadata.writer",
+    "roles/container.admin",
+    "roles/container.clusterAdmin",
+    "roles/container.clusterViewer",
+    "roles/container.developer",
+    "roles/editor"
   ]
   description = "List of the default IAM roles to attach to the service account on the GKE Nodes."
 }

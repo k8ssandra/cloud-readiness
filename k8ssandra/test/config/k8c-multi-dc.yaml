@@ -1,0 +1,44 @@
+apiVersion: k8ssandra.io/v1alpha1
+kind: K8ssandraCluster
+metadata:
+  name:  bootz-k8c-cluster
+spec:
+  auth: false
+  cassandra:
+    serverVersion: "4.0.1"
+    datacenters:
+      - metadata:
+          name: dc1
+        k8sContext: gke_community-ecosystem_us-central1_dev-bootz001
+        size: 1
+        storageConfig:
+          cassandraDataVolumeClaimSpec:
+            storageClassName: standard
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+        config:
+          jvmOptions:
+            heapSize: 1024Mi
+        networking:
+          hostNetwork: true
+      - metadata:
+          name: dc2
+        k8sContext: gke_community-ecosystem_us-central1_dev-bootz002
+        size: 1
+        storageConfig:
+          cassandraDataVolumeClaimSpec:
+            storageClassName: standard
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+        config:
+          jvmOptions:
+            heapSize: 1024Mi
+        networking:
+          hostNetwork: true
+    mgmtAPIHeap: 512Mi
