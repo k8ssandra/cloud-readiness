@@ -1,0 +1,9 @@
+stargate:
+  size: 1
+  heapSize: 1024Mi
+  resources:
+    limits:
+      memory: 2024Mi
+  reaper:
+    autoScheduling:
+      enabled: true

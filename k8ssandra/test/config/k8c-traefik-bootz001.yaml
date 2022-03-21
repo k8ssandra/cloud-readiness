@@ -1,0 +1,16 @@
+# https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+ports:
+  traefik:
+    expose: true
+    port: 30090
+    nodePort: 31090
+  web-http:
+    expose: true
+    port: 30080
+    nodePort: 31080
+  stargate-native:
+    expose: true
+    port: 30942
+    nodePort: 30142
+service:
+  type: NodePort

@@ -125,3 +125,38 @@ resource "google_compute_firewall" "rdp_compute_firewall" {
   }
   target_tags = ["rdp"]
 }
+
+# Allow gossiper traffic
+resource "google_compute_firewall" "http_gossip_firewall" {
+  name    = format("%s-fw-gossip-http", var.name)
+  network = google_compute_network.compute_network.name
+  project = var.project_id
+  allow {
+    protocol = "tcp"
+    ports    = ["7000"]
+  }
+  target_tags = ["http"]
+}
+
+resource "google_compute_firewall" "https_gossip_firewall" {
+  name    = format("%s-fw-gossip-https", var.name)
+  network = google_compute_network.compute_network.name
+  project = var.project_id
+  allow {
+    protocol = "tcp"
+    ports    = ["7001"]
+  }
+  target_tags = ["https"]
+}
+
+# Allow management api traffic
+resource "google_compute_firewall" "http_mgmt-api_firewall" {
+  name    = format("%s-fw-mgmt-api-http", var.name)
+  network = google_compute_network.compute_network.name
+  project = var.project_id
+  allow {
+    protocol = "tcp"
+    ports    = ["8080"]
+  }
+  target_tags = ["http"]
+}

@@ -36,6 +36,7 @@ import (
 
 const (
 	defaultTestSubFolder                = "env"
+	defaultCassandraOperatorName        = "k8ssandra-operator-cass-operator"
 	defaultK8ssandraRepositoryName      = "k8ssandra"
 	defaultK8ssandraOperatorReleaseName = "k8ssandra-operator"
 	defaultK8ssandraOperatorChart       = "k8ssandra/k8ssandra-operator"
@@ -43,15 +44,19 @@ const (
 	defaultCertManagerFile              = "https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml"
 	defaultCertManagerRepositoryName    = "jetstack"
 	defaultCertManagerRepositoryURL     = "https://charts.jetstack.io"
+	defaultTraefikRepositoryName        = "traefik"
+	defaultTraefikRepositoryURL         = "https://helm.traefik.io/traefik"
+	defaultTraefikChartName             = "traefik/traefik"
+	defaultRelativeRootFolder           = "../.."
+	prefixFolderName                    = "cloud-k8c-"
 
-	defaultRelativeRootFolder = "../.."
-	prefixFolderName          = "cloud-k8c-"
-	DefaultAdminIdentifier    = "K8C_ADMIN_ID"
+	DefaultAdminIdentifier = "K8C_ADMIN_ID"
+	DefaultTraefikVersion  = "v10.3.2"
 )
 
 func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, provisionMeta model.ProvisionMeta) model.ProvisionMeta {
-	uniqueProvisionId := random.UniqueId()
 
+	uniqueProvisionId := random.UniqueId()
 	var meta = model.ProvisionMeta{
 		KubeConfigs:       map[string]string{},
 		ProvisionId:       uniqueProvisionId,
@@ -129,38 +134,24 @@ func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string,
 	return helmOptions
 }
 
-func repoSetup(t *testing.T, helmOptions *helm.Options) bool {
-	logger.Log(t, "setting up repository entries")
-
-	helm.RemoveRepoE(t, helmOptions, defaultCertManagerRepositoryName)
-	helm.AddRepo(t, helmOptions, defaultCertManagerRepositoryName, defaultCertManagerRepositoryURL)
-
-	helm.RemoveRepoE(t, helmOptions, defaultK8ssandraRepositoryName)
-	helm.AddRepo(t, helmOptions, defaultK8ssandraRepositoryName, defaultK8ssandraRepositoryURL)
-
-	_, err := helm.RunHelmCommandAndGetStdOutE(t, helmOptions, "repo", "update")
-	require.NoError(t, err)
-	return true
-}
-
 // TODO - clean story completion
 func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, config model.ReadinessConfig) {
 	logger.Log(t, "clean requested")
-//	provConfig := config.ProvisionConfig
-//
-//	terraform.Init(t, options)
-//
-//	Cleanup(t, options)
-//
-//	CheckNodesReady(t, kubectlOptions, 0,
-//		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
+	//	provConfig := config.ProvisionConfig
+	//
+	//	terraform.Init(t, options)
+	//
+	//	Cleanup(t, options)
+	//
+	//	CheckNodesReady(t, kubectlOptions, 0,
+	//		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
 }
 
 // TODO - clean story completion
 func apply(t *testing.T, options *terraform.Options, config model.ReadinessConfig) {
 	// provConfig := config.ProvisionConfig
 	terraform.InitAndApply(t, options)
-	logger.Log(t, fmt.Sprintf("test artifact name: %s",t.Name()))
+	logger.Log(t, fmt.Sprintf("test artifact name: %s", t.Name()))
 	//if provConfig.PreTestCleanup {
 	//	Cleanup(t, options)
 	//}
