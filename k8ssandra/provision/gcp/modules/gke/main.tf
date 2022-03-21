@@ -79,7 +79,9 @@ resource "google_container_node_pool" "container_node_pool" {
     metadata = {
       disable-legacy-endpoints = "true"
     }
+    labels = {
 
+    }
 
     service_account = var.service_account
     oauth_scopes = [
@@ -92,6 +94,7 @@ resource "google_container_node_pool" "container_node_pool" {
       "https://www.googleapis.com/auth/trace.append",
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/cloud-platform",
     ]
   }
 
