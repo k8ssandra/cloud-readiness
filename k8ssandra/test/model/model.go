@@ -56,6 +56,7 @@ type NetworkConfig struct {
 }
 
 type ProvisionConfig struct {
+	Simulate           bool        `json:"simulate,omitempty"`
 	PreTestCleanup     bool        `json:"pre_test_cleanup,omitempty"`
 	PostTestCleanup    bool        `json:"post_test_cleanup,omitempty"`
 	CleanOnly          bool        `json:"clean_only,omitempty"`
@@ -74,10 +75,10 @@ type ProvisionResult struct {
 }
 
 type ContextConfig struct {
-	Name          string   `json:"name,omitempty"`
-	Namespace     string   `json:"namespace,omitempty"`
-	ClusterLabels []string `json:"cluster_labels,omitempty"`
-	NetworkConfig            NetworkConfig `json:"network_config,omitempty"`
+	Name          string        `json:"name,omitempty"`
+	Namespace     string        `json:"namespace,omitempty"`
+	ClusterLabels []string      `json:"cluster_labels,omitempty"`
+	NetworkConfig NetworkConfig `json:"network_config,omitempty"`
 }
 
 type ContextOption struct {
@@ -106,6 +107,11 @@ type ContextServiceAccount struct {
 	Token     string `json:"token" yaml:"token,omitempty"`
 	Cert      []byte `json:"cert"`
 	Namespace string `json:"namespace" yaml:"namespace,omitempty"`
+}
+
+type ContextTestDetail struct {
+	Name          string `json:"name"`
+	ModulesFolder string `json:"modules_folder"`
 }
 
 type ProvisionMeta struct {
