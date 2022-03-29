@@ -32,7 +32,7 @@ module "aks" {
   tags = merge(local.tags, { "resource_group" = module.iam.resource_group_name })
 }
 
-# Azure Virtuval network module
+# Azure virtual network module
 module "vnet" {
   source                    = "../modules/vnet"
   name                      = local.prefix
