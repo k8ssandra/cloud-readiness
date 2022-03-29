@@ -57,10 +57,11 @@ const (
 func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, provisionMeta model.ProvisionMeta) model.ProvisionMeta {
 
 	uniqueProvisionId := random.UniqueId()
+	testFolderName := path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId)
 	var meta = model.ProvisionMeta{
 		KubeConfigs:       map[string]string{},
 		ProvisionId:       uniqueProvisionId,
-		ArtifactsRootDir:  path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId),
+		ArtifactsRootDir:  testFolderName,
 		Enabled:           provisionMeta.Enabled,
 		ServiceAccount:    provisionMeta.ServiceAccount,
 		DefaultConfigPath: provisionMeta.DefaultConfigPath,
@@ -74,9 +75,20 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 	initTempArtifacts(t, meta)
 
 	for name, ctx := range readinessConfig.Contexts {
+
+		testPath := ts.FormatTestDataPath(testFolderName, ctx.Name)
+		logger.Log(t, fmt.Sprintf("test path formatted as: %s", testPath))
+
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
 		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
 			meta.DefaultConfigPath)
+
+		testData := model.ContextTestDetail{
+			Name:          ctx.Name,
+			ModulesFolder: modulesFolder,
+		}
+
+		ts.SaveTestData(t, testPath, testData)
 		provisionCluster(t, name, ctx, readinessConfig, options, meta)
 	}
 	return meta
@@ -117,10 +129,14 @@ func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config
 		if provConfig.CleanOnly {
 			clean(t, tfOptions[name], kubeOptions, config)
 		} else {
-			apply(t, tfOptions[name], config)
+			if provConfig.Simulate == true {
+				logger.Log(t, "\n\n\nsimulation mode, provisioning init & apply not being executed.")
+				logger.Log(t, fmt.Sprintf("t.name() = %s", t.Name()))
+			} else {
+				apply(t, tfOptions[name], config)
+			}
 		}
 	})
-
 	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
 }
 
