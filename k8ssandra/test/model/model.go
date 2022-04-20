@@ -56,11 +56,6 @@ type NetworkConfig struct {
 }
 
 type ProvisionConfig struct {
-	Simulate           bool        `json:"simulate,omitempty"`
-	PreTestCleanup     bool        `json:"pre_test_cleanup,omitempty"`
-	PostTestCleanup    bool        `json:"post_test_cleanup,omitempty"`
-	CleanOnly          bool        `json:"clean_only,omitempty"`
-	CleanDir           string      `json:"clean_dir,omitempty"`
 	DefaultRetries     int         `json:"default_retries,omitempty"`
 	DefaultSleepSecs   int         `json:"default_sleep_secs,omitempty"`
 	DefaultTimeoutSecs int         `json:"default_timeout_secs,omitempty"`
@@ -109,14 +104,16 @@ type ContextServiceAccount struct {
 	Namespace string `json:"namespace" yaml:"namespace,omitempty"`
 }
 
-type ContextTestDetail struct {
+type ContextTestManifest struct {
 	Name          string `json:"name"`
 	ModulesFolder string `json:"modules_folder"`
 }
 
 type ProvisionMeta struct {
+	Simulate          bool              `json:"simulate,omitempty"`
 	RemoveAll         bool              `json:"remove_all,omitempty"`
-	Enabled           bool              `json:"enabled,omitempty"`
+	InstallEnabled    bool              `json:"install_enabled,omitempty"`
+	ProvisionEnabled  bool              `json:"provision_enabled,omitempty"`
 	ProvisionId       string            `json:"provision_id,omitempty"`
 	KubeConfigs       map[string]string `json:"kube_configs,omitempty"`
 	ServiceAccount    string            `json:"service_account"`

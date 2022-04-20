@@ -17,107 +17,19 @@ limitations under the License.
 **/
 
 import (
-	"github.com/gruntwork-io/terratest/modules/random"
-	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
-	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
-	_ "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
-	"strings"
+	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/testdata/scenario_1"
+	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
 	"testing"
 )
 
 func TestK8cSmoke(t *testing.T) {
 
-	configRootDir, configPath := util.FetchKubeConfigPath(t)
+	// 1. Collect context specific to scenario
+	contexts := Contexts()
 
-	// Enable to utilize an existing set of cloud infrastructure artifacts already existing.
-	// The ProvisionId and ArtifactsRootDir must be supplied with accurate information.
-	// When not-enabled, will provision fresh cloud infrastructure based on model values.
-	var provisionMeta = ProvisionMeta{
-		Enabled:           false,
-		RemoveAll:         false,
-		ProvisionId:       "k8c-qxgoFP",
-		ArtifactsRootDir:  "/tmp/cloud-k8c-qxgoFP",
-		KubeConfigs:       nil,
-		ServiceAccount:    "",
-		DefaultConfigPath: configPath,
-		DefaultConfigDir:  configRootDir,
-		AdminIdentity:     util.DefaultAdminIdentifier,
-	}
+	// 2. Construct a cloud-readiness model w/ provisioning metadata.
+	meta, config := ReadinessConfig(t, contexts)
 
-	cloudConfig := CloudConfig{
-		Project:     "community-ecosystem",
-		Region:      "us-central1",
-		Location:    "us-central1-a",
-		Environment: "dev",
-		MachineType: "e2-highcpu-8",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-		Bucket:      "google_storage_bucket",
-	}
-
-	k8cConfig := K8cConfig{
-		MedusaSecretName:        "dev-k8ssandra-medusa-key",
-		MedusaSecretFromFileKey: "medusa_gcp_key",
-		MedusaSecretFromFile:    "medusa_gcp_key.json",
-		ClusterName:             "bootz-k8c-cluster",
-		ValuesFilePath:          "k8ssandra-clusters-v2.yaml",
-		ClusterScoped:           false,
-	}
-
-	tfConfig := TFConfig{
-		ModuleFolder: "./provision/gcp",
-	}
-
-	helmConfig := HelmConfig{
-		ChartPath: "k8ssandra/k8ssandra",
-	}
-
-	provisionConfig := ProvisionConfig{
-		CleanOnly:          false,
-		CleanDir:           "<as-needed>",
-		PreTestCleanup:     false,
-		PostTestCleanup:    false,
-		TFConfig:           tfConfig,
-		HelmConfig:         helmConfig,
-		CloudConfig:        cloudConfig,
-		K8cConfig:          k8cConfig,
-		DefaultSleepSecs:   20,
-		DefaultRetries:     30,
-		DefaultTimeoutSecs: 240,
-	}
-
-	ctxConfig1 := ContextConfig{
-		Name:          "bootz800",
-		Namespace:     "bootz",
-		ClusterLabels: []string{"control-plane"},
-	}
-
-	ctxConfig2 := ContextConfig{
-		Name:          "bootz801",
-		Namespace:     "bootz",
-		ClusterLabels: []string{"data-plane"},
-	}
-
-	ctxConfig3 := ContextConfig{
-		Name:          "bootz802",
-		Namespace:     "bootz",
-		ClusterLabels: []string{"data-plane"},
-	}
-
-	contexts := map[string]ContextConfig{
-		ctxConfig1.Name: ctxConfig1,
-		ctxConfig2.Name: ctxConfig2,
-		ctxConfig3.Name: ctxConfig3,
-	}
-
-	k8cReadinessConfig := ReadinessConfig{
-		UniqueId:                 strings.ToLower(random.UniqueId()),
-		Contexts:                 contexts,
-		ServiceAccountNameSuffix: "sa",
-		// Expected nodes per zone
-		ExpectedNodeCount: 2,
-		ProvisionConfig:   provisionConfig,
-	}
-
-	util.Apply(t, provisionMeta, k8cReadinessConfig)
+	// 3. Apply desired activities based on model and metadata.
+	Apply(t, meta, config)
 }

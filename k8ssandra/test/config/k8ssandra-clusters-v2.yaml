@@ -20,7 +20,7 @@ spec:
     datacenters:
       - metadata:
           name: dc1
-        k8sContext: gke_community-ecosystem_us-central1_dev-bootz001
+        k8sContext: gke_community-ecosystem_us-central1_dev-bootz000
         size: 3
       - metadata:
           name: dc2

@@ -11,10 +11,6 @@ properties as well as specific references to `Terraform`, `Helm`,
 `cloud` and `K8ssandra` configurations.  
 
 ```
-PreTestCleanup     bool
-PostTestCleanup    bool
-CleanOnly          bool
-CleanDir           string
 DefaultRetries     int
 DefaultSleepSecs   int
 DefaultTimeoutSecs int

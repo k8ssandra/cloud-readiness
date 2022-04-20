@@ -1,5 +1,3 @@
-package smoke
-
 /**
 Copyright 2022 DataStax, Inc.
 
@@ -16,59 +14,69 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+package scenario_1
+
 import (
 	"github.com/gruntwork-io/terratest/modules/random"
-	. "github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
-	_ "github.com/k8ssandra/cloud-readiness/k8ssandra/test/util"
 	"strings"
 	"testing"
 )
 
-func TestK8cSmokeTemplate(t *testing.T) {
+/**
+Enable to utilize an existing set of cloud infrastructure artifacts already existing.
+The ProvisionId and ArtifactsRootDir must be supplied with accurate information.
+When not-enabled, will provision fresh cloud infrastructure based on model values.
+*/
+
+func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (model.ProvisionMeta, model.ReadinessConfig) {
 
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 
-	// When enabled, utilizes an existing set provisioned clusters
-	var meta = ProvisionMeta{
-		InstallEnabled:    true,
-		ProvisionId:       "FpWdV6",
+	var provisionMeta = model.ProvisionMeta{
+		Simulate:          false,
+		RemoveAll:         false,
+		InstallEnabled:    false,
+		ProvisionEnabled:  true,
+		ProvisionId:       "k8c-buJzqw",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-buJzqw",
 		KubeConfigs:       nil,
 		ServiceAccount:    "",
-		ArtifactsRootDir:  "<reference-dir example: /tmp/cloud-k8c-FpWdV6>",
 		DefaultConfigPath: configPath,
 		DefaultConfigDir:  configRootDir,
-		AdminIdentity:     "K8C_ADMIN_ID",
+		AdminIdentity:     util.DefaultAdminIdentifier,
 	}
 
-	cloudConfig := CloudConfig{
+	cloudConfig := model.CloudConfig{
 		Project:     "community-ecosystem",
 		Region:      "us-central1",
 		Location:    "us-central1-a",
 		Environment: "dev",
 		MachineType: "e2-highcpu-8",
-		CredPath:    "<your-path-to-creds>",
-		CredKey:     "<example: GOOGLE_APPLICATION_CREDENTIALS>",
+		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
+		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
 		Bucket:      "google_storage_bucket",
 	}
 
-	k8cConfig := K8cConfig{
+	k8cConfig := model.K8cConfig{
 		MedusaSecretName:        "dev-k8ssandra-medusa-key",
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
-		ValuesFilePath:          "k8ssandra-clusters-c403.yaml",
+		ClusterName:             "bootz-k8c-cluster",
+		ValuesFilePath:          "k8c-multi-dc.yaml",
 		ClusterScoped:           false,
 	}
 
-	tfConfig := TFConfig{
+	tfConfig := model.TFConfig{
 		ModuleFolder: "./provision/gcp",
 	}
 
-	helmConfig := HelmConfig{
+	helmConfig := model.HelmConfig{
 		ChartPath: "k8ssandra/k8ssandra",
 	}
 
-	provisionConfig := ProvisionConfig{
+	provisionConfig := model.ProvisionConfig{
 		TFConfig:           tfConfig,
 		HelmConfig:         helmConfig,
 		CloudConfig:        cloudConfig,
@@ -78,35 +86,15 @@ func TestK8cSmokeTemplate(t *testing.T) {
 		DefaultTimeoutSecs: 240,
 	}
 
-	ctxConfig1 := ContextConfig{
-		Name:          "<ctx-name-1>",
-		Namespace:     "<your-ns>",
-		ClusterLabels: []string{"control-plane"},
-	}
-
-	ctxConfig2 := ContextConfig{
-		Name:          "<ctx-name-2>",
-		Namespace:     "<your-ns>",
-		ClusterLabels: []string{"data-plane"},
-	}
-
-	ctxConfig3 := ContextConfig{
-		Name:          "<ctx-name-3>",
-		Namespace:     "<your-ns>",
-		ClusterLabels: []string{"data-plane"},
-	}
-
-	contexts := map[string]ContextConfig{ctxConfig1.Name: ctxConfig1,
-		ctxConfig2.Name: ctxConfig2, ctxConfig3.Name: ctxConfig3}
-
-	k8cReadinessConfig := ReadinessConfig{
+	readinessConfig := model.ReadinessConfig{
 		UniqueId:                 strings.ToLower(random.UniqueId()),
 		Contexts:                 contexts,
 		ServiceAccountNameSuffix: "sa",
+
 		// Expected nodes per zone
-		ExpectedNodeCount: 1,
+		ExpectedNodeCount: 2,
 		ProvisionConfig:   provisionConfig,
 	}
 
-	util.Apply(t, meta, k8cReadinessConfig)
+	return provisionMeta, readinessConfig
 }

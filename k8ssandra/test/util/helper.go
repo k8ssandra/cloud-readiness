@@ -18,20 +18,24 @@ limitations under the License.
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
+	"github.com/goccy/go-yaml"
+	"github.com/gruntwork-io/terratest/modules/files"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util/cloud/gcp"
 	"github.com/mitchellh/go-homedir"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/clientcmd/api"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/utils/strings/slices"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -39,37 +43,31 @@ import (
 	"time"
 )
 
+const (
+	defaultArtifactFormat       = "/tmp/TestK8cSmoke(\\w+)/"
+	defaultParentArtifactFormat = "/tmp/(\\w+)"
+)
+
 // Apply based on provision meta and configuration settings
-func Apply(t *testing.T, meta model.ProvisionMeta, k8cReadinessConfig model.ReadinessConfig) {
+func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
-	if meta.Enabled && meta.RemoveAll {
-		// TODO - use the metadata for where the folders were created.
-		// ArtifactsRootDir
-
-		// /tmp/<test-dirs>
+	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Simulate)))
+	if meta.RemoveAll && !meta.InstallEnabled && !meta.ProvisionEnabled {
+		logger.Log(t, "existing infrastructure provisioning is being referenced in "+
+			"meta, cleanup of artifacts started")
+		RemoveProvisioningArtifacts(t, meta, readinessConfig)
+	} else if meta.ProvisionEnabled && !meta.InstallEnabled {
+		logger.Log(t, fmt.Sprintf("existing infrastructure provisioning is not being referenced, "+
+			"provision started %s", meta.ProvisionId))
+		meta = ProvisionMultiCluster(t, readinessConfig, meta)
+		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
+	} else if meta.InstallEnabled && !meta.ProvisionEnabled {
+		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
+		InstallK8ssandra(t, readinessConfig, meta)
 	} else {
-
-		if !meta.Enabled {
-			logger.Log(t, "an existing infrastructure provisioning is not being referenced, provision will be started ...")
-			meta = ProvisionMultiCluster(t, k8cReadinessConfig, meta)
-			require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
-			logger.Log(t, fmt.Sprintf("provision submitted for identifier: %s", meta.ProvisionId))
-		} else {
-			logger.Log(t, fmt.Sprintf("found an existing infrastructure to reference, identifier: %s", meta.ProvisionId))
-			logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
-			InstallK8ssandra(t, k8cReadinessConfig, meta)
-		}
+		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply (e.g. InstallEnabled, ProvisionEnabled, RemoveAll)."))
 	}
-}
 
-// CheckNodesReady checks for N nodes in ready state with retries having sleep seconds
-func CheckNodesReady(t *testing.T, options *k8s.KubectlOptions, expectedNumber int,
-	retries int, sleepSecsBetween int) {
-	waitUntilExpectedNodes(t, options, expectedNumber, retries, time.Duration(sleepSecsBetween)*time.Second)
-
-	k8s.WaitUntilAllNodesReady(t, options, retries, time.Duration(sleepSecsBetween)*time.Second)
-	readyNodes := k8s.GetReadyNodes(t, options)
-	assert.Equal(t, len(readyNodes), expectedNumber)
 }
 
 // CreateOptions constructs Terraform options, which include kubeConfig path.
@@ -126,37 +124,6 @@ func IsControlPlane(ctxConfig model.ContextConfig) bool {
 	return slices.Contains(ctxConfig.ClusterLabels, defaultControlPlaneLabel)
 }
 
-// checkForAllNodes determines if expected number of nodes exist
-func checkForAllNodes(t *testing.T, options *k8s.KubectlOptions, expectedNumber int) (string, error) {
-	nodes, err := k8s.GetNodesE(t, options)
-	if err != nil {
-		return "", err
-	}
-	if len(nodes) != expectedNumber {
-		return "", errors.New("expected nodes NOT found")
-	}
-	return "all expected nodes are found", nil
-}
-
-// waitUntilExpectedNodes polls k8s cluster for an expected number of nodes
-func waitUntilExpectedNodes(t *testing.T, options *k8s.KubectlOptions,
-	expectedNumber int, retries int, sleepSecsBetween time.Duration) {
-	statusMsg := fmt.Sprintf("waiting for %d nodes to be available.", expectedNumber)
-
-	message, err := retry.DoWithRetryE(
-		t,
-		statusMsg,
-		retries,
-		sleepSecsBetween,
-		func() (string, error) { return checkForAllNodes(t, options, expectedNumber) },
-	)
-	if err != nil {
-		logger.Log(t, "Error waiting for expected number of nodes: %s", err)
-		t.Fatal(err)
-	}
-	logger.Log(t, message)
-}
-
 func FetchCertificate(t *testing.T, options *k8s.KubectlOptions, secret string, namespace string) ([]byte, error) {
 	logger.Log(t, fmt.Sprintf("obtaining certificate"))
 	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "secret", secret, "-n", namespace, "-o", "jsonpath={.data['ca\\.crt']}")
@@ -199,13 +166,378 @@ func FetchEnv(t *testing.T, key string) string {
 	return os.Getenv(key)
 }
 
-func DeleteResource(t *testing.T, kubeConfig *k8s.KubectlOptions, resourceKind string, resourceName string) {
+func CreateClientConfigurations(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig,
+	ctxOptions map[string]model.ContextOption) {
 
-	require.NotEmpty(t, resourceKind, "required resource kind to be specified for delete")
-	require.NotEmpty(t, resourceName, "required resource name to be specified for delete")
-	_, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "delete", resourceKind, resourceName)
-	if err != nil {
-		logger.Log(t, fmt.Sprintf("WARNING: attempt to delete resource of kind: %s "+
-			"and name: %s failed: %s", resourceKind, resourceName, err.Error()))
+	if meta.Simulate {
+		logger.Log(t, "\n\nK8ssandra: SIMULATE creating client configurations")
+		return
 	}
+
+	logger.Log(t, "\n\nK8ssandra: creating client configurations")
+	var generatedClientConfigs []string
+	var kubeConfig *k8s.KubectlOptions
+
+	for name, ctxConfig := range readinessConfig.Contexts {
+
+		kubeConfig = ctxOptions[name].KubectlOptions
+		SetCurrentContext(t, ctxOptions[name].FullName, kubeConfig)
+
+		AddServiceAccount(t, ctxOptions[name], ctxConfig.Namespace, kubeConfig)
+		SetupTestArtifactDirectory(t, ctxOptions[name])
+
+		generatedClientConfig := GenerateClientConfig(t, ctxOptions[name])
+		generatedClientConfigs = append(generatedClientConfigs, generatedClientConfig)
+	}
+
+	CreateConfigs(t, ctxOptions, readinessConfig)
+
+	logger.Log(t, "\n\nK8ssandra: Creating the generic secret ...")
+	for name, ctxConfig := range readinessConfig.Contexts {
+		kubeConfig = ctxOptions[name].KubectlOptions
+		CreateGenericSecret(t, ctxConfig.Namespace, kubeConfig)
+	}
+
+	// Apply generated client configs for each cluster.
+	for name, ctxConfig := range readinessConfig.Contexts {
+		for _, gcc := range generatedClientConfigs {
+			SetCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].KubectlOptions)
+			applyClientConfig(t, ctxOptions[name].KubectlOptions, gcc, ctxConfig.Namespace)
+		}
+	}
+
+	// delete pods, then perform a rollout restart of the operators.
+	for name, ctxConfig := range readinessConfig.Contexts {
+		RestartOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
+		RestartCassOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
+	}
+}
+
+func SetupTestArtifactDirectory(t *testing.T, ctxOption model.ContextOption) {
+
+	rootPath := ConfigRootPath(t, ctxOption, "")
+	mkdError := os.MkdirAll(rootPath, defaultTempFilePerm)
+	require.NoError(t, mkdError, fmt.Sprintf("Unable to setup tmp file location for test artifacts"+
+		"root path: %s", rootPath))
+}
+
+func CreateConfigs(t *testing.T, ctxOptions map[string]model.ContextOption, readinessConfig model.ReadinessConfig) {
+
+	var clusters []v1.NamedCluster
+	var auths []v1.NamedAuthInfo
+	var namedContexts []v1.NamedContext
+	var currentContext string
+
+	for name := range readinessConfig.Contexts {
+		ctxOption := ctxOptions[name]
+
+		var cluster = v1.Cluster{
+			Server:                   ctxOption.ServerAddress,
+			InsecureSkipTLSVerify:    false,
+			CertificateAuthorityData: ctxOption.ServiceAccount.Cert,
+		}
+
+		var namedCluster = v1.NamedCluster{
+			Name:    ctxOption.FullName,
+			Cluster: cluster,
+		}
+		clusters = append(clusters, namedCluster)
+
+		var authInfo = v1.AuthInfo{
+			Token: ctxOption.ServiceAccount.Token,
+		}
+
+		userName := ctxOption.FullName
+		var namedAuthInfo = v1.NamedAuthInfo{
+			Name:     userName,
+			AuthInfo: authInfo,
+		}
+		auths = append(auths, namedAuthInfo)
+
+		var context = v1.Context{
+			Cluster:  ctxOption.FullName,
+			AuthInfo: namedAuthInfo.Name,
+		}
+
+		if IsControlPlane(readinessConfig.Contexts[name]) {
+			currentContext = ctxOption.FullName
+		}
+
+		var namedContext = v1.NamedContext{
+			Name:    userName,
+			Context: context,
+		}
+		namedContexts = append(namedContexts, namedContext)
+	}
+
+	var cfg = v1.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		Preferences:    v1.Preferences{},
+		Clusters:       clusters,
+		AuthInfos:      auths,
+		Contexts:       namedContexts,
+		CurrentContext: currentContext,
+		Extensions:     nil,
+	}
+
+	for name := range ctxOptions {
+		ctxOption := ctxOptions[name]
+		absolutePath := WriteKubeConfig(t, ctxOption, cfg)
+		kubeConfig := k8s.NewKubectlOptions(ctxOption.FullName, absolutePath, ctxOption.ServiceAccount.Namespace)
+
+		*(ctxOptions[name].KubectlOptions) = *kubeConfig
+		logger.Log(t, fmt.Sprintf("Assigned ctx name: %s to kube config ctx: %s @ %s", name, kubeConfig.ContextName, kubeConfig.ConfigPath))
+	}
+
+}
+
+func CreateIdentityEnv(configPath string, identity string, credPath string) map[string]string {
+	return map[string]string{
+		"KUBECONFIG":                     configPath,
+		"GOOGLE_IDENTITY_EMAIL":          identity,
+		"GOOGLE_APPLICATION_CREDENTIALS": credPath,
+	}
+}
+
+func SetCurrentContext(t *testing.T, ctxName string, kubeConfig *k8s.KubectlOptions) bool {
+	kubeConfig.Env["KUBECONFIG"] = kubeConfig.ConfigPath
+	logger.Log(t, fmt.Sprintf("==== setting current context with kubeconfig target: %s", kubeConfig.Env["KUBECONFIG"]))
+	_, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "config", "set", "current-context", ctxName)
+	require.NoError(t, err, "expecting to set current context without error")
+	return err == nil
+}
+
+func ConfigRootPath(t *testing.T, contextOption model.ContextOption, fileName string) string {
+	rootPath := path.Join(contextOption.ProvisionMeta.ArtifactsRootDir, contextOption.FullName)
+	if fileName != "" {
+		return path.Join(rootPath, fileName)
+	}
+	logger.Log(t, fmt.Sprintf("cloud temp context-specific root path: %s", rootPath))
+	return rootPath
+}
+
+func ConfigCloudTempRootPath(t *testing.T, contextOption model.ContextOption, fileName string) string {
+	rootPath := contextOption.ProvisionMeta.ArtifactsRootDir
+	if fileName != "" {
+		return path.Join(rootPath, fileName)
+	}
+	logger.Log(t, fmt.Sprintf("cloud temp root path: %s", rootPath))
+	return rootPath
+}
+
+func CreateGenericSecret(t *testing.T, namespace string, kubeConfig *k8s.KubectlOptions) {
+	logger.Log(t, fmt.Sprintf("generating secret with name: %s", defaultK8ssandraSecret))
+
+	kubeConfig.Namespace = namespace
+	var _, err = k8s.RunKubectlAndGetOutputE(t, kubeConfig, "create", "secret", "generic",
+		defaultK8ssandraSecret, "-n", namespace, "--from-file", kubeConfig.ConfigPath)
+
+	if err != nil {
+		// Try recovery by removing existing.
+		_, err2 := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "delete", "secret", defaultK8ssandraSecret,
+			"-n", namespace)
+		require.NoError(t, err2)
+
+		_, err = k8s.RunKubectlAndGetOutputE(t, kubeConfig,
+			"create", "secret", "generic", defaultK8ssandraSecret, "-n", namespace, "--from-file", kubeConfig.ConfigPath)
+	}
+	require.NoError(t, err)
+}
+
+func GenerateClientConfig(t *testing.T, ctxOption model.ContextOption) string {
+	var clientConfigSpec = model.ClientConfigSpec{
+		ContextName:      ctxOption.FullName,
+		KubeConfigSecret: corev1.LocalObjectReference{Name: defaultK8ssandraSecret},
+	}
+
+	clientConfigName := strings.ReplaceAll(ctxOption.FullName, "_", "-")
+	objectMeta := model.ObjectMeta{Name: clientConfigName}
+
+	clientConfig := model.ClientConfig{
+		ApiVersion: "config.k8ssandra.io/v1beta1",
+		Spec:       clientConfigSpec,
+		Kind:       "ClientConfig",
+		Metadata:   objectMeta,
+	}
+	return WriteClientConfig(t, ctxOption, clientConfig)
+}
+
+func WriteClientConfig(t *testing.T, ctxOption model.ContextOption, clientConfig model.ClientConfig) string {
+	yamlOut, marshalError := yaml.Marshal(&clientConfig)
+	if marshalError != nil {
+		logger.Log(t, marshalError.Error())
+	}
+
+	fileName := ctxOption.ShortName + "-client_config.yaml"
+	absoluteFilePath := ConfigRootPath(t, ctxOption, fileName)
+
+	if files.FileExists(absoluteFilePath) {
+		err := os.Remove(absoluteFilePath)
+		require.NoError(t, err, fmt.Sprintf("Unable to cleanup existing client-config: %s", absoluteFilePath))
+	}
+
+	logger.Log(t, fmt.Sprintf("writing client-config to: %s ", absoluteFilePath))
+	writeError := ioutil.WriteFile(absoluteFilePath, yamlOut, defaultTempFilePerm)
+	require.NoError(t, writeError, fmt.Sprintf("Unable to write client-config: %s", absoluteFilePath))
+
+	return absoluteFilePath
+}
+
+func WriteKubeConfig(t *testing.T, ctxOption model.ContextOption, clientConfig v1.Config) string {
+	yamlOut, marshalError := yaml.Marshal(&clientConfig)
+	if marshalError != nil {
+		logger.Log(t, marshalError.Error())
+	}
+
+	fileName := defaultKubeConfigFileName
+	absoluteFilePath := ConfigCloudTempRootPath(t, ctxOption, fileName)
+
+	if files.FileExists(absoluteFilePath) {
+		err := os.Remove(absoluteFilePath)
+		require.NoError(t, err, fmt.Sprintf("Unable to cleanup existing kube-config: %s", absoluteFilePath))
+	}
+
+	mkdError := os.MkdirAll(ConfigRootPath(t, ctxOption, ""), defaultTempFilePerm)
+	require.NoError(t, mkdError, fmt.Sprintf("Unable to setup tmp file location for kube config artifact "+
+		"to: %s", absoluteFilePath))
+	logger.Log(t, fmt.Sprintf("writing kube config to: %s ", absoluteFilePath))
+	writeError := ioutil.WriteFile(absoluteFilePath, yamlOut, defaultTempFilePerm)
+	require.NoError(t, writeError, fmt.Sprintf("Unable to write kube config: %s", absoluteFilePath))
+	return absoluteFilePath
+}
+
+func AddServiceAccount(t *testing.T, ctxOption model.ContextOption, namespace string,
+	kubeConfig *k8s.KubectlOptions) {
+
+	logger.Log(t, fmt.Sprintf("adding service account:%s to context using ns:%s", defaultK8ssandraOperatorReleaseName, namespace))
+
+	kubeConfig.Namespace = namespace
+	csa := model.ContextServiceAccount{}
+	csa.Namespace = namespace
+
+	csa.Secret = FetchSecret(t, kubeConfig, defaultK8ssandraOperatorReleaseName, namespace)
+	csa.Token = FetchToken(t, kubeConfig, csa.Secret, namespace)
+	csa.Cert, _ = FetchCertificate(t, kubeConfig, csa.Secret, namespace)
+
+	require.NotEmpty(t, csa.Cert, "Expected certificate data available for secret")
+	*ctxOption.ServiceAccount = csa
+
+	logger.Log(t, fmt.Sprintf("certificate and token obtained for secret:%s", csa.Secret))
+}
+
+func CreateContextOptions(t *testing.T, readinessConfig model.ReadinessConfig,
+	provisionMeta model.ProvisionMeta, configs map[string]*k8s.KubectlOptions) map[string]model.ContextOption {
+
+	logger.Log(t, fmt.Sprintf("\n\ncreating all context options for "+
+		"provision id: %s", provisionMeta.ProvisionId))
+
+	ctxOptions := map[string]model.ContextOption{}
+
+	for name, ctx := range readinessConfig.Contexts {
+		fullName := gcp.ConstructFullContextName(name, readinessConfig)
+		logger.Log(t, fmt.Sprintf("creating context options for context:%s with ns:%s",
+			ctx.Name, ctx.Namespace))
+
+		cloudClusterName := gcp.ConstructCloudClusterName(name, readinessConfig.ProvisionConfig.CloudConfig)
+		saName := cloudClusterName + "-" + readinessConfig.ServiceAccountNameSuffix + defaultIdentityDomain
+
+		kubeCluster := SelectClusterFromKube(t, name, configs)
+		require.NotNil(t, kubeCluster, fmt.Sprintf("expected kube cluster to be found for name: %s", name))
+
+		logger.Log(t, fmt.Sprintf("setting context options with service account: %s and "+
+			"server: %s", saName, kubeCluster.Server))
+		ctxOptions[name] = model.ContextOption{
+			ShortName:      name,
+			FullName:       fullName,
+			KubectlOptions: configs[name],
+			AdminOptions:   configs[name],
+			ServiceAccount: &model.ContextServiceAccount{Name: saName, Namespace: ctx.Namespace,
+				Cert: kubeCluster.CertificateAuthorityData},
+			ServerAddress: kubeCluster.Server,
+			ProvisionMeta: provisionMeta,
+		}
+	}
+	return ctxOptions
+}
+
+func SelectClusterFromKube(t *testing.T, name string, configs map[string]*k8s.KubectlOptions) *api.Cluster {
+
+	ko := configs[name]
+	rawConfig, err := k8s.LoadConfigFromPath(ko.ConfigPath).RawConfig()
+	require.NoError(t, err, "Expecting to be able to obtain infrastructure provisioned cluster raw configuration")
+	for clusterName, config := range rawConfig.Clusters {
+		if strings.Contains(clusterName, name) {
+			return config
+		}
+	}
+	return nil
+}
+
+func RestartOperator(t *testing.T, namespace string, options *k8s.KubectlOptions) {
+	logger.Log(t, "\n\nK8ssandra: restarting k8ssandra-operator")
+
+	pod, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod",
+		"-l", "app.kubernetes.io/name=k8ssandra-operator", "-n", namespace, "-o", "name")
+
+	if err == nil && pod != "" {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "pod",
+			pod, "-n", namespace)
+
+		if err != nil {
+			logger.Log(t, fmt.Sprintf("WARNING: attempt to delete pod: %s failed due to: %s", pod, err))
+		}
+	}
+
+	_, err2 := k8s.RunKubectlAndGetOutputE(t, options, "rollout", "restart",
+		"deployment", defaultK8ssandraOperatorReleaseName, "-n", namespace)
+
+	require.NoError(t, err2)
+	time.Sleep(defaultTimeout)
+}
+
+func RestartCassOperator(t *testing.T, namespace string, options *k8s.KubectlOptions) {
+
+	logger.Log(t, "\n\nK8ssandra: restarting k8ssandra-cass-operator")
+
+	// k get pods -n bootz -l app.kubernetes.io/name=cass-operator -o name
+	pod, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod",
+		"-l", "app.kubernetes.io/name=cass-operator", "-n", namespace, "-o", "name")
+
+	if err == nil && pod != "" {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", pod, "-n", namespace)
+		if err != nil {
+			logger.Log(t, fmt.Sprintf("WARNING: attempt to delete pod: %s failed due to: %s", pod, err))
+		}
+	}
+
+	_, err2 := k8s.RunKubectlAndGetOutputE(t, options, "rollout", "restart",
+		"deployment", defaultCassandraOperatorName, "-n", namespace)
+	require.NoError(t, err2)
+	time.Sleep(defaultTimeout)
+}
+
+func WaitForEndpoint(t *testing.T, kubeConfig *k8s.KubectlOptions, name string) string {
+	out, err := k8s.RunKubectlAndGetOutputE(t, kubeConfig, "get", "ep", name, "-o=jsonpath='{.subsets[0].addresses[0].ip}'")
+	require.NoError(t, err, "unexpected error when attempting to obtain endpoint ip availability")
+	return out
+}
+
+func IsPodRunning(t *testing.T, options *k8s.KubectlOptions, prefixName string) (bool, string) {
+	out, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod", "--field-selector=status.phase=Running",
+		"--no-headers", "-l", "app.kubernetes.io/name=k8ssandra-operator", "-n", options.Namespace,
+		"-o", "custom-columns=\":metadata.name\"")
+
+	if err != nil {
+		logger.Log(t, fmt.Sprintf("get pod by meta name returned error: %s", err.Error()))
+		return false, out
+	}
+
+	logger.Log(t, fmt.Sprintf("get running pod by meta name returned: %s", out))
+	return out == prefixName, out
+}
+
+func applyClientConfig(t *testing.T, options *k8s.KubectlOptions, clientConfigFile string, namespace string) {
+	_, err := k8s.RunKubectlAndGetOutputE(t, options, "-n", namespace, "apply", "-f", clientConfigFile)
+	require.NoError(t, err)
 }
