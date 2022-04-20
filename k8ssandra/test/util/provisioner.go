@@ -62,7 +62,7 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 		KubeConfigs:       map[string]string{},
 		ProvisionId:       uniqueProvisionId,
 		ArtifactsRootDir:  testFolderName,
-		Enabled:           provisionMeta.Enabled,
+		InstallEnabled:    provisionMeta.InstallEnabled,
 		ServiceAccount:    provisionMeta.ServiceAccount,
 		DefaultConfigPath: provisionMeta.DefaultConfigPath,
 		DefaultConfigDir:  provisionMeta.DefaultConfigDir,
@@ -83,19 +83,20 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
 			meta.DefaultConfigPath)
 
-		testData := model.ContextTestDetail{
+		testData := model.ContextTestManifest{
 			Name:          ctx.Name,
 			ModulesFolder: modulesFolder,
 		}
 
 		ts.SaveTestData(t, testPath, testData)
-		provisionCluster(t, name, ctx, readinessConfig, options, meta)
+		provisionCluster(t, name, readinessConfig, options, meta)
 	}
 	return meta
 }
 
 func Cleanup(t *testing.T, options *terraform.Options) {
 	logger.Log(t, "cleanup started")
+	terraform.InitAndPlan(t, options)
 	out := terraform.Destroy(t, options)
 	logger.Log(t, fmt.Sprintf("destroy output: %s", out))
 }
@@ -111,67 +112,56 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
 }
 
-func provisionCluster(t *testing.T, name string, ctx model.ContextConfig, config model.ReadinessConfig,
+func provisionCluster(t *testing.T, name string, config model.ReadinessConfig,
 	tfOptions map[string]*terraform.Options, meta model.ProvisionMeta) {
 
-	provConfig := config.ProvisionConfig
 	if files.FileExists(meta.DefaultConfigPath) {
 		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", meta.DefaultConfigPath))
 		cpErr := files.CopyFile(meta.DefaultConfigPath, meta.DefaultConfigPath+"-backup")
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
 
-	kubeOptions := k8s.NewKubectlOptions(name, meta.DefaultConfigPath, ctx.Namespace)
 	logger.Log(t, fmt.Sprintf("kube config created: %s", meta.DefaultConfigPath))
-
 	provisionSuccess := t.Run(name, func(t *testing.T) {
 		t.Parallel()
-		if provConfig.CleanOnly {
-			clean(t, tfOptions[name], kubeOptions, config)
+		if meta.RemoveAll {
+			Cleanup(t, tfOptions[name])
 		} else {
-			if provConfig.Simulate == true {
+			if meta.Simulate {
 				logger.Log(t, "\n\n\nsimulation mode, provisioning init & apply not being executed.")
 				logger.Log(t, fmt.Sprintf("t.name() = %s", t.Name()))
 			} else {
-				apply(t, tfOptions[name], config)
+				apply(t, tfOptions[name])
 			}
 		}
 	})
 	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
 }
 
-func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string) *helm.Options {
+func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string,
+	isSimulate bool) *helm.Options {
+
+	var extraArgs = map[string][]string{}
+	if isSimulate {
+		extraArgs["install"] = []string{"--debug", "--dry-run"}
+	}
 
 	helmOptions := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kubeConfig,
 		EnvVars:        envs,
+		ExtraArgs:      extraArgs,
 	}
+
 	return helmOptions
 }
 
-// TODO - clean story completion
-func clean(t *testing.T, options *terraform.Options, kubectlOptions *k8s.KubectlOptions, config model.ReadinessConfig) {
-	logger.Log(t, "clean requested")
-	//	provConfig := config.ProvisionConfig
-	//
-	//	terraform.Init(t, options)
-	//
-	//	Cleanup(t, options)
-	//
-	//	CheckNodesReady(t, kubectlOptions, 0,
-	//		provConfig.DefaultRetries, provConfig.DefaultSleepSecs)
-}
+func apply(t *testing.T, options *terraform.Options) {
 
-// TODO - clean story completion
-func apply(t *testing.T, options *terraform.Options, config model.ReadinessConfig) {
-	// provConfig := config.ProvisionConfig
-	terraform.InitAndApply(t, options)
-	logger.Log(t, fmt.Sprintf("test artifact name: %s", t.Name()))
-	//if provConfig.PreTestCleanup {
-	//	Cleanup(t, options)
-	//}
-	//if provConfig.PostTestCleanup {
-	//	defer Cleanup(t, options)
-	//}
+	terraform.InitAndPlan(t, options)
+	logger.Log(t, fmt.Sprintf("initialized and planned: %s", t.Name()))
+
+	terraform.Apply(t, options)
+	logger.Log(t, fmt.Sprintf("applied: %s", t.Name()))
+
 }

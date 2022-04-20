@@ -33,7 +33,7 @@ func TestK8cAzureSmoke(t *testing.T) {
 	// The ProvisionId and ArtifactsRootDir must be supplied with accurate information.
 	// When not-enabled, will provision fresh cloud infrastructure based on model values.
 	var provisionMeta = ProvisionMeta{
-		Enabled:           false,
+		InstallEnabled:    false,
 		RemoveAll:         false,
 		ProvisionId:       "k8c-fTNba1",
 		ArtifactsRootDir:  "/tmp/cloud-k8c-fTNba1",
@@ -73,10 +73,6 @@ func TestK8cAzureSmoke(t *testing.T) {
 	}
 
 	provisionConfig := ProvisionConfig{
-		CleanOnly:          false,
-		CleanDir:           "<as-needed>",
-		PreTestCleanup:     false,
-		PostTestCleanup:    false,
 		TFConfig:           tfConfig,
 		HelmConfig:         helmConfig,
 		CloudConfig:        cloudConfig,
