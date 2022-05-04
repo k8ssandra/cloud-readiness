@@ -28,6 +28,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 # Kubernetes cluster configuration variables
 variable "kubernetes_version" {
   description = "Version of the AKS cluster."

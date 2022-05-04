@@ -22,6 +22,11 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+}
+
 variable "project_id" {
   description = "The project ID where all resources will be launched."
   type        = string
@@ -42,6 +47,12 @@ variable "region" {
   description = "The location of the GKE cluster."
   type        = string
 }
+
+variable "node_locations" {
+  description = "The node locations of the GKE cluster."
+  type        = list(string)
+}
+
 
 variable "network_link" {
   description = "network link variable from vpc module outputs"

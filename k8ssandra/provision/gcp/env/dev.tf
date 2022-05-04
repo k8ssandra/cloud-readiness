@@ -13,18 +13,20 @@
 # limitations under the License.
 
 module "vpc" {
-  source      = "../modules/vpc"
-  name        = local.prefix
-  environment = var.environment
-  region      = var.region
-  project_id  = var.project_id
+  source       = "../modules/vpc"
+  name         = local.prefix
+  environment  = var.environment
+  region       = var.region
+  project_id   = var.project_id
 }
 
 module "gke" {
   source             = "../modules/gke"
   environment        = var.environment
+  provision_id       = var.provision_id
   name               = local.prefix
   region             = var.region
+  node_locations     = var.node_locations
   project_id         = var.project_id
   initial_node_count = var.initial_node_count
   machine_type       = var.machine_type

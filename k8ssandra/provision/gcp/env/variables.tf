@@ -64,10 +64,22 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+}
+
 variable "region" {
   description = "The region in which to create the VPC network"
   type        = string
 }
+
+variable "node_locations" {
+  description = "The list of node locations"
+  type        = list(string)
+  default     = ["us-central1-a"]
+}
+
 
 variable "project_id" {
   description = "The GCP project in which the components are created."

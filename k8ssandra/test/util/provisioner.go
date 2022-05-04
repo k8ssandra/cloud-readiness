@@ -27,6 +27,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	ts "github.com/gruntwork-io/terratest/modules/test-structure"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
+	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/util/cloud/gcp"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path"
@@ -58,14 +59,18 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 
 	uniqueProvisionId := random.UniqueId()
 	testFolderName := path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId)
+
 	var meta = model.ProvisionMeta{
 		KubeConfigs:       map[string]string{},
 		ProvisionId:       uniqueProvisionId,
 		ArtifactsRootDir:  testFolderName,
-		InstallEnabled:    provisionMeta.InstallEnabled,
 		ServiceAccount:    provisionMeta.ServiceAccount,
 		DefaultConfigPath: provisionMeta.DefaultConfigPath,
 		DefaultConfigDir:  provisionMeta.DefaultConfigDir,
+		Simulate:          provisionMeta.Simulate,
+		RemoveAll:         provisionMeta.RemoveAll,
+		InstallEnabled:    provisionMeta.InstallEnabled,
+		ProvisionEnabled:  provisionMeta.ProvisionEnabled,
 		AdminIdentity:     DefaultAdminIdentifier,
 	}
 
@@ -80,7 +85,8 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 		logger.Log(t, fmt.Sprintf("test path formatted as: %s", testPath))
 
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
-		options := CreateOptions(readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
+
+		options := CreateOptions(meta, readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
 			meta.DefaultConfigPath)
 
 		testData := model.ContextTestManifest{
@@ -88,17 +94,40 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 			ModulesFolder: modulesFolder,
 		}
 
+		identity := FetchEnv(t, meta.AdminIdentity)
+		env := CreateIdentityEnv(meta.DefaultConfigPath, identity, ctx.CloudConfig.CredPath)
+
+		gcp.Switch(t, identity, env)
 		ts.SaveTestData(t, testPath, testData)
-		provisionCluster(t, name, readinessConfig, options, meta)
+
+		provisionCluster(t, name, options, meta)
 	}
 	return meta
 }
 
-func Cleanup(t *testing.T, options *terraform.Options) {
-	logger.Log(t, "cleanup started")
-	terraform.InitAndPlan(t, options)
-	out := terraform.Destroy(t, options)
-	logger.Log(t, fmt.Sprintf("destroy output: %s", out))
+func Cleanup(t *testing.T, meta model.ProvisionMeta, name string, options map[string]*terraform.Options) bool {
+
+	logger.Log(t, fmt.Sprintf("cleanup started for resources in: %s", name))
+
+	if meta.Simulate {
+		logger.Log(t, fmt.Sprintf("SIMULATE cleanup of cloud resources returning success."))
+		return true
+	}
+
+	initPlanOut, initPlanErr := terraform.InitAndPlanE(t, options[name])
+	if initPlanErr != nil {
+		logger.Log(t, fmt.Sprintf("failed cleanup on init-plan, error: %s", initPlanErr.Error()))
+		return false
+	}
+	logger.Log(t, fmt.Sprintf("successful cleanup init-plan, output: %s", initPlanOut))
+
+	destroyOut, destroyErr := terraform.DestroyE(t, options[name])
+	if destroyErr != nil {
+		logger.Log(t, fmt.Sprintf("failed cleanup destroy, error: %s", destroyErr.Error()))
+	} else {
+		logger.Log(t, fmt.Sprintf("successful cleanup destroy, output: %s", destroyOut))
+	}
+	return destroyErr == nil
 }
 
 func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
@@ -112,8 +141,8 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
 }
 
-func provisionCluster(t *testing.T, name string, config model.ReadinessConfig,
-	tfOptions map[string]*terraform.Options, meta model.ProvisionMeta) {
+func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform.Options,
+	meta model.ProvisionMeta) {
 
 	if files.FileExists(meta.DefaultConfigPath) {
 		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", meta.DefaultConfigPath))
@@ -121,21 +150,17 @@ func provisionCluster(t *testing.T, name string, config model.ReadinessConfig,
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
 
-	logger.Log(t, fmt.Sprintf("kube config created: %s", meta.DefaultConfigPath))
 	provisionSuccess := t.Run(name, func(t *testing.T) {
 		t.Parallel()
-		if meta.RemoveAll {
-			Cleanup(t, tfOptions[name])
+		if meta.Simulate {
+			logger.Log(t, fmt.Sprintf("SIMULATION, the provisioning init & apply is not "+
+				"being invoked for %s", t.Name()))
 		} else {
-			if meta.Simulate {
-				logger.Log(t, "\n\n\nsimulation mode, provisioning init & apply not being executed.")
-				logger.Log(t, fmt.Sprintf("t.name() = %s", t.Name()))
-			} else {
-				apply(t, tfOptions[name])
-			}
+			logger.Log(t, fmt.Sprintf("apply being invoked for name: %s", name))
+			apply(t, tfOptions[name])
 		}
 	})
-	logger.Log(t, fmt.Sprintf("provision: %s result: %s", name, strconv.FormatBool(provisionSuccess)))
+	logger.Log(t, fmt.Sprintf("provision: %s success: %s", name, strconv.FormatBool(provisionSuccess)))
 }
 
 func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string,

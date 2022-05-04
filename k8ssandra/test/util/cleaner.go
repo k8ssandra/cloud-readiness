@@ -24,8 +24,11 @@ import (
 	ts "github.com/gruntwork-io/terratest/modules/test-structure"
 	"github.com/k8ssandra/cloud-readiness/k8ssandra/test/model"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
 	"os"
+	"path"
 	"regexp"
+	"strconv"
 	"testing"
 )
 
@@ -41,34 +44,59 @@ func DeleteResource(t *testing.T, kubeConfig *k8s.KubectlOptions, resourceKind s
 	}
 }
 
-func RemoveProvisioningArtifacts(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
+func RemoveProvisioningArtifacts(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig,
+	isCloudCleanRequested bool) {
+
+	logger.Log(t, fmt.Sprintf("remove provisioning artifacts with cloud clean request: %s",
+		strconv.FormatBool(isCloudCleanRequested)))
 
 	// Remove tmp artifacts first, followed by overall test manifest unless issue detected
-	if removeTempArtifacts(t, meta, readinessConfig) {
+	if removeTempArtifacts(t, meta, readinessConfig, isCloudCleanRequested) {
 		removeManifestFolder(t, meta)
 	}
 }
 
-func removeTempArtifacts(t *testing.T, meta model.ProvisionMeta, config model.ReadinessConfig) bool {
+func removeTempArtifacts(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig,
+	isCloudCleanRequested bool) bool {
 
 	var isSuccess = true
-	for _, ctx := range config.Contexts {
+	artifacts, err := ioutil.ReadDir(path.Join(meta.ArtifactsRootDir, ".test-data"))
 
-		if tdPath := ts.FormatTestDataPath(meta.ArtifactsRootDir, ctx.Name); tdPath != "" && files.IsExistingDir(tdPath) {
+	if err != nil {
+		logger.Log(t, fmt.Sprintf("WARNING: Unable to locate the '.test-data' in this test artifact.  "+
+			"Not removing to ensure verficiation before delete in: %s.  A manual removal of the test "+
+			"artifacts is required.", meta.ArtifactsRootDir))
+		return false
+	}
+
+	for _, artifact := range artifacts {
+
+		logger.Log(t, fmt.Sprintf("removing tmp artifacts in dir: %s for artifact: %s",
+			meta.ArtifactsRootDir, artifact.Name()))
+		if tdPath := ts.FormatTestDataPath(meta.ArtifactsRootDir, artifact.Name()); tdPath != "" &&
+			files.IsExistingDir(tdPath) {
+
 			logger.Log(t, fmt.Sprintf("Test data artifacts located, checking for manifest file in path: %s", tdPath))
 			manifest := &model.ContextTestManifest{}
 			ts.LoadTestData(t, tdPath, manifest)
 
 			if manifest != nil && manifest.ModulesFolder != "" {
-				isSuccess = removeArtifactsAndFolders(t, meta, manifest)
-				if !isSuccess {
-					logger.Log(t, fmt.Sprintf("WARNING: failed to locate the test data "+
-						"for artifact: %s in the /tmp folder", tdPath))
+
+				var isResourceCleanupComplete = false
+				if isCloudCleanRequested {
+					tfOptions := CreateOptions(meta, readinessConfig, path.Join(manifest.ModulesFolder,
+						defaultTestSubFolder), meta.DefaultConfigPath)
+					isResourceCleanupComplete = Cleanup(t, meta, manifest.Name, tfOptions)
+				}
+
+				if !isCloudCleanRequested || isResourceCleanupComplete {
+					isSuccess = removeArtifactsAndFolders(t, meta, manifest)
+					if !isSuccess {
+						logger.Log(t, fmt.Sprintf("WARNING: failed to locate the test data "+
+							"for artifact: %s in the /tmp folder", tdPath))
+					}
 				}
 			}
-		} else {
-			logger.Log(t, fmt.Sprintf("There are no data artifacts located in dir: %s "+
-				"for: %s", meta.ArtifactsRootDir, ctx.Name))
 		}
 	}
 	return isSuccess

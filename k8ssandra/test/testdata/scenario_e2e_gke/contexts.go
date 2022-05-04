@@ -23,55 +23,54 @@ import (
 
 func Contexts() map[string]model.ContextConfig {
 
-	// Traefik
-	networkConfig000 := model.NetworkConfig{
+	networkConfigUsEast := model.NetworkConfig{
 		TraefikValuesFile: "k8c-traefik-bootz000.yaml",
 		TraefikVersion:    util.DefaultTraefikVersion,
 	}
 
-	networkConfig001 := model.NetworkConfig{
+	networkConfigUsNorth := model.NetworkConfig{
 		TraefikValuesFile: "k8c-traefik-bootz001.yaml",
 		TraefikVersion:    util.DefaultTraefikVersion,
-	}
-
-	// Cloud specific
-	cloudConfigUsCentral := model.CloudConfig{
-		Project:     "community-ecosystem",
-		Region:      "us-central1",
-		Locations:   []string{"us-central1-a", "us-central1-b", "us-central1-c"},
-		Environment: "dev",
-		MachineType: "e2-standard-4",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-		Bucket:      "google_storage_bucket",
 	}
 
 	cloudConfigUsEast := model.CloudConfig{
 		Project:     "community-ecosystem",
 		Region:      "us-east1",
+		Zones:       []string{"us-east1-b", "us-east1-c", "us-east1-d"},
 		Locations:   []string{"us-east1-b", "us-east1-c", "us-east1-d"},
-		Environment: "dev",
+		Environment: "e2e",
 		MachineType: "e2-standard-4",
 		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
 		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
 		Bucket:      "google_storage_bucket",
 	}
 
-	// Context scoping
+	cloudConfigUsNorth := model.CloudConfig{
+		Project:     "community-ecosystem",
+		Region:      "us-north",
+		Zones:       []string{"us-north1-a", "us-north1-b", "us-north1-c"},
+		Locations:   []string{"us-north1-a", "us-north1-b", "us-north1-c"},
+		Environment: "e2e",
+		MachineType: "e2-standard-4",
+		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
+		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
+		Bucket:      "google_storage_bucket",
+	}
+
 	ctxConfig1 := model.ContextConfig{
-		Name:          "bootz3-central",
-		Namespace:     "bootz",
-		CloudConfig:   cloudConfigUsCentral,
+		Name:          "k8ssandra-ci-us-east",
+		Namespace:     "default",
 		ClusterLabels: []string{"control-plane", "data-plane"},
-		NetworkConfig: networkConfig000,
+		NetworkConfig: networkConfigUsEast,
+		CloudConfig:   cloudConfigUsEast,
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "bootz3-east",
-		Namespace:     "bootz",
-		CloudConfig:   cloudConfigUsEast,
+		Name:          "k8ssandra-ci-us-north",
+		Namespace:     "default",
 		ClusterLabels: []string{"data-plane"},
-		NetworkConfig: networkConfig001,
+		NetworkConfig: networkConfigUsNorth,
+		CloudConfig:   cloudConfigUsNorth,
 	}
 
 	return map[string]model.ContextConfig{

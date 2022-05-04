@@ -22,6 +22,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 variable "role_arn" {
   description = "IAM role arn to attach the EKS cluster."
   type        = string
