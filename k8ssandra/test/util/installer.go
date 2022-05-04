@@ -93,13 +93,6 @@ func installK8ssandraCluster(t *testing.T, meta model.ProvisionMeta, readinessCo
 
 		if IsControlPlane(ctxConfig) {
 
-			// todo - address timing and re-install of this ....
-			//if isK8ssandraClusterExisting(t, kubeConfig, ctxConfig.Namespace) {
-			//	logger.Log(t, "k8c existing, removing")
-			//	removeK8ssandraCluster(t, kubeConfig, readinessConfig.ProvisionConfig.K8cConfig.ClusterName, ctxConfig.Namespace)
-			//	time.Sleep(time.Second * 15)
-			//}
-
 			kubeConfig.Env[defaultControlPlaneKey] = "true"
 
 			if meta.Simulate {
@@ -110,7 +103,7 @@ func installK8ssandraCluster(t *testing.T, meta model.ProvisionMeta, readinessCo
 			logger.Log(t, fmt.Sprintf("=== deploying k8ssandra-cluster on control plane: %s", name))
 			require.Eventually(t, func() bool {
 				endpointIP := WaitForEndpoint(t, kubeConfig, defaultK8ssandraOperatorReleaseName+"-"+defaultWebhookServiceName)
-				// logger.Log(t, fmt.Sprintf("endpoint discovery on control-plane: %s", endpointIP))
+				logger.Log(t, fmt.Sprintf("endpoint discovery on control-plane: %s", endpointIP))
 				return strings.TrimSpace(endpointIP) != "''"
 			}, time.Second*30, defaultInterval, "timeout waiting for endpoint ip to exist")
 
@@ -213,6 +206,10 @@ func installK8ssandraOperator(t *testing.T, options *helm.Options, contextName s
 			logger.Log(t, "SIMULATE checking pod availability for k8ssandra-operator along with patching K8SSANDRA_CONTROL_PLANE=false")
 		} else {
 			patchContent := "{\"spec\": {\"containers\": [{\"env\": [{\"name\":\"K8SSANDRA_CONTROL_PLANE\",\"value\":\"false\"}]}]}}"
+			/*
+				 CONTROL_PLANE: kind-k8ssandra-0
+				2022-04-21T21:43:24.2506565Z   DATA_PLANES: kind-k8ssandra-1,kind-k8ssandra-2
+			*/
 			isRunning, podName := IsPodRunning(t, options.KubectlOptions, "k8ssandra-operator")
 			if isRunning {
 				out, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", podName, "-p", patchContent)
@@ -236,22 +233,20 @@ func installSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.
 	identity := FetchEnv(t, meta.AdminIdentity)
 	require.NotEmpty(t, identity, "expecting identity to be provided to apply preconditions")
 
-	env := CreateIdentityEnv(meta.DefaultConfigPath, identity, readinessConfig.ProvisionConfig.CloudConfig.CredPath)
-
-	gcp.Switch(t, identity, env)
-
 	var contextConfigs = map[string]*k8s.KubectlOptions{}
 	var isRepoSetup = false
-	for name := range readinessConfig.Contexts {
-		logger.Log(t, fmt.Sprintf("precondition for name: %s", name))
-		fullName := gcp.ConstructFullContextName(name, readinessConfig)
 
-		gcp.FetchCreds(t, readinessConfig, env, gcp.ConstructCloudClusterName(name,
-			readinessConfig.ProvisionConfig.CloudConfig))
+	for name, ctx := range readinessConfig.Contexts {
 
+		logger.Log(t, fmt.Sprintf("installation setup for: %s", name))
+
+		env := CreateIdentityEnv(meta.DefaultConfigPath, identity, ctx.CloudConfig.CredPath)
+		gcp.Switch(t, identity, env)
+
+		fullName := gcp.ConstructFullContextName(name, ctx.CloudConfig)
+		gcp.FetchCreds(t, ctx.CloudConfig, env, gcp.ConstructCloudClusterName(name, ctx.CloudConfig))
 		kubeConfig := k8s.NewKubectlOptions(fullName, meta.DefaultConfigPath,
 			readinessConfig.Contexts[name].Namespace)
-
 		SetCurrentContext(t, fullName, kubeConfig)
 
 		helmOptions := createHelmOptions(kubeConfig, map[string]string{}, map[string]string{},
@@ -263,6 +258,7 @@ func installSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.
 
 		installCertManager(t, kubeConfig, meta.Simulate)
 		contextConfigs[name] = kubeConfig
+
 		installTraefik(t, helmOptions, readinessConfig.Contexts[name], meta.Simulate)
 	}
 
@@ -306,8 +302,11 @@ func installTraefik(t *testing.T, helmOptions *helm.Options, config model.Contex
 		return
 	}
 
-	DeleteResource(t, helmOptions.KubectlOptions, "ClusterRoleBinding", defaultTraefikResourceName)
-	DeleteResource(t, helmOptions.KubectlOptions, "ClusterRole", defaultTraefikResourceName)
+	withoutNamespace := &helmOptions.KubectlOptions
+	(*withoutNamespace).Namespace = ""
+
+	DeleteResource(t, *withoutNamespace, "ClusterRoleBinding", defaultTraefikResourceName)
+	DeleteResource(t, *withoutNamespace, "ClusterRole", defaultTraefikResourceName)
 
 	_, _ = uninstallTraefik(t, helmOptions)
 

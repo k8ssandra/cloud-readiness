@@ -23,6 +23,11 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
 variable "region" {
   description = "The AWS region where terraform builds resources."
   type        = string

@@ -17,6 +17,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 variable "name" {
   description = "Name is the prefix to use for resources that needs to be created."
   type        = string
@@ -87,7 +93,7 @@ variable "public_service_endpoints" {
 }
 
 locals {
-  # Prefix of the resourecs.
+  # Prefix of the resources.
   prefix = format("%s-%s", lower(var.environment), lower(var.name))
 
   tags = {

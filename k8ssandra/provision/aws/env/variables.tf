@@ -23,6 +23,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 variable "resource_owner" {
   description = "The name of the Account Owner"
   type        = string

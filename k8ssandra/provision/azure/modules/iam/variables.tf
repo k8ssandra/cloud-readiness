@@ -28,6 +28,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 variable "tags" {
   description = "A map of the tags to use on the resources that are deployed with this module."
   type        = map(string)

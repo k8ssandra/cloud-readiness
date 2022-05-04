@@ -15,7 +15,7 @@
 # Create Google Service Account
 resource "google_service_account" "service_account" {
   account_id   = format("%s-sa", var.name)
-  display_name = "GKE Security Service Account"
+  display_name = format("gke-%s", var.name)
   project      = var.project_id
 }
 

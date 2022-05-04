@@ -1,10 +1,3 @@
-package model
-
-import (
-	"github.com/gruntwork-io/terratest/modules/k8s"
-	corev1 "k8s.io/api/core/v1"
-)
-
 /**
 Copyright 2022 DataStax, Inc.
 
@@ -21,17 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+package model
+
+import (
+	"github.com/gruntwork-io/terratest/modules/k8s"
+	corev1 "k8s.io/api/core/v1"
+)
+
 type CloudConfig struct {
-	Type        string `json:"type,omitempty"`
-	Location    string `json:"location,omitempty"`
-	Region      string `json:"region,omitempty"`
-	Project     string `json:"project,omitempty"`
-	Name        string `json:"name,omitempty"`
-	CredPath    string `json:"cred_path,omitempty"`
-	CredKey     string `json:"cred_key,omitempty"`
-	Environment string `json:"environment,omitempty"`
-	MachineType string `json:"machine_type,omitempty"`
-	Bucket      string `json:"bucket,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	Locations   []string `json:"locations,omitempty"`
+	Zones       []string `json:"zones,omitempty"`
+	Region      string   `json:"region,omitempty"`
+	Project     string   `json:"project,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	CredPath    string   `json:"cred_path,omitempty"`
+	CredKey     string   `json:"cred_key,omitempty"`
+	Environment string   `json:"environment,omitempty"`
+	MachineType string   `json:"machine_type,omitempty"`
+	Bucket      string   `json:"bucket,omitempty"`
 }
 type TFConfig struct {
 	ModuleFolder string `json:"module_folder,omitempty"`
@@ -56,13 +57,12 @@ type NetworkConfig struct {
 }
 
 type ProvisionConfig struct {
-	DefaultRetries     int         `json:"default_retries,omitempty"`
-	DefaultSleepSecs   int         `json:"default_sleep_secs,omitempty"`
-	DefaultTimeoutSecs int         `json:"default_timeout_secs,omitempty"`
-	HelmConfig         HelmConfig  `json:"helm_config"`
-	TFConfig           TFConfig    `json:"tf_config"`
-	CloudConfig        CloudConfig `json:"cloud_config"`
-	K8cConfig          K8cConfig   `json:"k8c_config"`
+	DefaultRetries     int        `json:"default_retries,omitempty"`
+	DefaultSleepSecs   int        `json:"default_sleep_secs,omitempty"`
+	DefaultTimeoutSecs int        `json:"default_timeout_secs,omitempty"`
+	HelmConfig         HelmConfig `json:"helm_config"`
+	TFConfig           TFConfig   `json:"tf_config"`
+	K8cConfig          K8cConfig  `json:"k8c_config"`
 }
 
 type ProvisionResult struct {
@@ -74,6 +74,7 @@ type ContextConfig struct {
 	Namespace     string        `json:"namespace,omitempty"`
 	ClusterLabels []string      `json:"cluster_labels,omitempty"`
 	NetworkConfig NetworkConfig `json:"network_config,omitempty"`
+	CloudConfig   CloudConfig   `json:"cloud_config,omitempty"`
 }
 
 type ContextOption struct {

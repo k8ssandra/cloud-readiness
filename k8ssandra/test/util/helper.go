@@ -53,19 +53,24 @@ func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.Readine
 
 	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Simulate)))
 	if meta.RemoveAll && !meta.InstallEnabled && !meta.ProvisionEnabled {
-		logger.Log(t, "existing infrastructure provisioning is being referenced in "+
-			"meta, cleanup of artifacts started")
-		RemoveProvisioningArtifacts(t, meta, readinessConfig)
+
+		logger.Log(t, fmt.Sprintf("remove all requested, existing infrastructure provisioning "+
+			"is being referenced: %s. Starting artifact removal.", meta.ArtifactsRootDir))
+		RemoveProvisioningArtifacts(t, meta, readinessConfig, true)
+
 	} else if meta.ProvisionEnabled && !meta.InstallEnabled {
 		logger.Log(t, fmt.Sprintf("existing infrastructure provisioning is not being referenced, "+
 			"provision started %s", meta.ProvisionId))
 		meta = ProvisionMultiCluster(t, readinessConfig, meta)
 		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
+
 	} else if meta.InstallEnabled && !meta.ProvisionEnabled {
 		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
 		InstallK8ssandra(t, readinessConfig, meta)
+
 	} else {
-		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply (e.g. InstallEnabled, ProvisionEnabled, RemoveAll)."))
+		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply "+
+			"(e.g. InstallEnabled, ProvisionEnabled, RemoveAll)."))
 	}
 
 }
@@ -73,27 +78,27 @@ func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.Readine
 // CreateOptions constructs Terraform options, which include kubeConfig path.
 // Names for cluster, service account, and buckets are made to be specific based on the ID provided.
 // Used for provisioning with
-func CreateOptions(config model.ReadinessConfig, rootFolder string,
+func CreateOptions(meta model.ProvisionMeta, config model.ReadinessConfig, rootFolder string,
 	kubeConfigPath string) map[string]*terraform.Options {
 
-	provConfig := config.ProvisionConfig
-	cloudConfig := provConfig.CloudConfig
-
 	var tfOptions = map[string]*terraform.Options{}
-	for name := range config.Contexts {
+	for name, ctx := range config.Contexts {
 
 		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-		saName := gcp.ConstructCloudClusterName(name, config.ProvisionConfig.CloudConfig) + "-" +
+		saName := gcp.ConstructCloudClusterName(name, ctx.CloudConfig) + "-" +
 			config.ServiceAccountNameSuffix + defaultIdentityDomain
-		uniqueBucketName := strings.ToLower(fmt.Sprintf(cloudConfig.Bucket+"-%s", config.UniqueId))
+
+		uniqueBucketName := strings.ToLower(fmt.Sprintf(ctx.CloudConfig.Bucket+"-%s", config.UniqueId))
 
 		vars := map[string]interface{}{
-			"project_id":              cloudConfig.Project,
+			"project_id":              ctx.CloudConfig.Project,
 			"name":                    uniqueClusterName,
-			"environment":             cloudConfig.Environment,
-			"location":                cloudConfig.Location,
-			"region":                  cloudConfig.Region,
-			"zone":                    cloudConfig.Region,
+			"machine_type":            ctx.CloudConfig.MachineType,
+			"environment":             ctx.CloudConfig.Environment,
+			"provision_id":            meta.ProvisionId,
+			"region":                  ctx.CloudConfig.Region,
+			"zone":                    ctx.CloudConfig.Region,
+			"node_locations":          ctx.CloudConfig.Locations,
 			"kubectl_config_path":     kubeConfigPath,
 			"initial_node_count":      config.ExpectedNodeCount,
 			"cluster_name":            uniqueClusterName,
@@ -101,13 +106,12 @@ func CreateOptions(config model.ReadinessConfig, rootFolder string,
 			"enable_private_endpoint": false,
 			"enable_private_nodes":    false,
 			"master_ipv4_cidr_block":  "10.0.0.0/28",
-			"machine_type":            cloudConfig.MachineType,
 			"bucket_policy_only":      true,
 			"role":                    "roles/storage.admin",
-			cloudConfig.Bucket:        uniqueBucketName,
+			ctx.CloudConfig.Bucket:    uniqueBucketName,
 		}
 
-		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": cloudConfig.CredPath,
+		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": ctx.CloudConfig.CredPath,
 			defaultControlPlaneKey: strconv.FormatBool(IsControlPlane(config.Contexts[name]))}
 
 		options := terraform.Options{
@@ -208,6 +212,7 @@ func CreateClientConfigurations(t *testing.T, meta model.ProvisionMeta, readines
 
 	// delete pods, then perform a rollout restart of the operators.
 	for name, ctxConfig := range readinessConfig.Contexts {
+		SetCurrentContext(t, ctxOptions[name].FullName, ctxOptions[name].KubectlOptions)
 		RestartOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
 		RestartCassOperator(t, ctxConfig.Namespace, ctxOptions[name].KubectlOptions)
 	}
@@ -435,11 +440,11 @@ func CreateContextOptions(t *testing.T, readinessConfig model.ReadinessConfig,
 	ctxOptions := map[string]model.ContextOption{}
 
 	for name, ctx := range readinessConfig.Contexts {
-		fullName := gcp.ConstructFullContextName(name, readinessConfig)
+		fullName := gcp.ConstructFullContextName(name, ctx.CloudConfig)
 		logger.Log(t, fmt.Sprintf("creating context options for context:%s with ns:%s",
 			ctx.Name, ctx.Namespace))
 
-		cloudClusterName := gcp.ConstructCloudClusterName(name, readinessConfig.ProvisionConfig.CloudConfig)
+		cloudClusterName := gcp.ConstructCloudClusterName(name, ctx.CloudConfig)
 		saName := cloudClusterName + "-" + readinessConfig.ServiceAccountNameSuffix + defaultIdentityDomain
 
 		kubeCluster := SelectClusterFromKube(t, name, configs)
@@ -481,8 +486,7 @@ func RestartOperator(t *testing.T, namespace string, options *k8s.KubectlOptions
 		"-l", "app.kubernetes.io/name=k8ssandra-operator", "-n", namespace, "-o", "name")
 
 	if err == nil && pod != "" {
-		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "pod",
-			pod, "-n", namespace)
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", pod, "-n", namespace)
 
 		if err != nil {
 			logger.Log(t, fmt.Sprintf("WARNING: attempt to delete pod: %s failed due to: %s", pod, err))

@@ -25,18 +25,18 @@ import (
 	"testing"
 )
 
-func ConstructFullContextName(contextName string, config model.ReadinessConfig) string {
-	return "gke_" + config.ProvisionConfig.CloudConfig.Project + "_" + config.ProvisionConfig.CloudConfig.Region + "_" +
-		config.ProvisionConfig.CloudConfig.Environment + "-" + contextName
+func ConstructFullContextName(contextName string, config model.CloudConfig) string {
+	return "gke_" + config.Project + "_" + config.Region + "_" +
+		config.Environment + "-" + contextName
 }
 
 func ConstructCloudClusterName(contextName string, config model.CloudConfig) string {
 	return config.Environment + "-" + contextName
 }
 
-func FetchCreds(t *testing.T, readinessConfig model.ReadinessConfig, env map[string]string, clusterName string) bool {
-	region := readinessConfig.ProvisionConfig.CloudConfig.Region
-	project := readinessConfig.ProvisionConfig.CloudConfig.Project
+func FetchCreds(t *testing.T, cloudConfig model.CloudConfig, env map[string]string, clusterName string) bool {
+	region := cloudConfig.Region
+	project := cloudConfig.Project
 	args := []string{"container", "clusters", "get-credentials", clusterName, "--region", region, "--project", project}
 	var cmd = shell.Command{
 		Command:    "gcloud",

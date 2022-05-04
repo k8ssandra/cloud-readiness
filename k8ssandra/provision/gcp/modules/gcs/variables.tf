@@ -22,6 +22,12 @@ variable "environment" {
   type        = string
 }
 
+variable "provision_id" {
+  description = "The ID for the infrastructure provisioning."
+  type        = string
+  default     = "unknown"
+}
+
 variable "project_id" {
   description = "The ID of the project to create the bucket in."
   type        = string

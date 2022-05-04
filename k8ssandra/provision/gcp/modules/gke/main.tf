@@ -18,6 +18,7 @@ resource "google_container_cluster" "container_cluster" {
   project                  = var.project_id
   description              = format("%s-gke-cluster", var.name)
   location                 = var.region
+  node_locations           = var.node_locations
   remove_default_node_pool = true
   initial_node_count       = var.initial_node_count
   enable_shielded_nodes    = true
@@ -46,6 +47,7 @@ resource "google_container_cluster" "container_cluster" {
   # Resource labels
   resource_labels = {
     environment = format("%s", var.environment)
+    provision_id = format("%s", var.provision_id)
   }
 
   # Creates Internal Load Balancer
@@ -84,7 +86,7 @@ resource "google_container_node_pool" "container_node_pool" {
     }
 
     service_account = var.service_account
-    oauth_scopes = [
+    oauth_scopes    = [
       "https://www.googleapis.com/auth/devstorage.read_write",
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring",

@@ -1,9 +1,16 @@
 # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
 ports:
-  traefik:
+  web:
     expose: true
-    port: 30090
-    nodePort: 31090
+    exposedPort: 8080
+    port: 8080
+    nodePort: 30080
+  websecure:
+    expose: false
+  cql:
+    expose: true
+    port: 9042
+    nodePort: 30942
   web-http:
     expose: true
     port: 30080
@@ -13,4 +20,4 @@ ports:
     port: 30942
     nodePort: 30142
 service:
-  type: NodePort
+  type: LoadBalancer
