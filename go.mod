@@ -104,6 +104,7 @@ require (
 )
 
 replace (
+	github.com/hashicorp/go-getter => github.com/hashicorp/go-getter v1.5.11
 	k8s.io/api => k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.22.2
