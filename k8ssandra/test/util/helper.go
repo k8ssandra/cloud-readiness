@@ -51,20 +51,20 @@ const (
 // Apply based on provision meta and configuration settings
 func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
-	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Simulate)))
-	if meta.RemoveAll && !meta.InstallEnabled && !meta.ProvisionEnabled {
+	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Enable.Simulate)))
+	if meta.Enable.RemoveAll && !meta.Enable.InstallEnabled && !meta.Enable.ProvisionEnabled {
 
 		logger.Log(t, fmt.Sprintf("remove all requested, existing infrastructure provisioning "+
 			"is being referenced: %s. Starting artifact removal.", meta.ArtifactsRootDir))
 		RemoveProvisioningArtifacts(t, meta, readinessConfig, true)
 
-	} else if meta.ProvisionEnabled && !meta.InstallEnabled {
+	} else if meta.Enable.ProvisionEnabled && !meta.Enable.InstallEnabled {
 		logger.Log(t, fmt.Sprintf("existing infrastructure provisioning is not being referenced, "+
 			"provision started %s", meta.ProvisionId))
 		meta = ProvisionMultiCluster(t, readinessConfig, meta)
 		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
 
-	} else if meta.InstallEnabled && !meta.ProvisionEnabled {
+	} else if meta.Enable.InstallEnabled && !meta.Enable.ProvisionEnabled {
 		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
 		InstallK8ssandra(t, readinessConfig, meta)
 
@@ -173,7 +173,7 @@ func FetchEnv(t *testing.T, key string) string {
 func CreateClientConfigurations(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig,
 	ctxOptions map[string]model.ContextOption) {
 
-	if meta.Simulate {
+	if meta.Enable.Simulate {
 		logger.Log(t, "\n\nK8ssandra: SIMULATE creating client configurations")
 		return
 	}

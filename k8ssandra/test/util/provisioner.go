@@ -62,15 +62,12 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 
 	var meta = model.ProvisionMeta{
 		KubeConfigs:       map[string]string{},
+		Enable:            provisionMeta.Enable,
 		ProvisionId:       uniqueProvisionId,
 		ArtifactsRootDir:  testFolderName,
 		ServiceAccount:    provisionMeta.ServiceAccount,
 		DefaultConfigPath: provisionMeta.DefaultConfigPath,
 		DefaultConfigDir:  provisionMeta.DefaultConfigDir,
-		Simulate:          provisionMeta.Simulate,
-		RemoveAll:         provisionMeta.RemoveAll,
-		InstallEnabled:    provisionMeta.InstallEnabled,
-		ProvisionEnabled:  provisionMeta.ProvisionEnabled,
 		AdminIdentity:     DefaultAdminIdentifier,
 	}
 
@@ -109,7 +106,7 @@ func Cleanup(t *testing.T, meta model.ProvisionMeta, name string, options map[st
 
 	logger.Log(t, fmt.Sprintf("cleanup started for resources in: %s", name))
 
-	if meta.Simulate {
+	if meta.Enable.Simulate {
 		logger.Log(t, fmt.Sprintf("SIMULATE cleanup of cloud resources returning success."))
 		return true
 	}
@@ -152,7 +149,7 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 
 	provisionSuccess := t.Run(name, func(t *testing.T) {
 		t.Parallel()
-		if meta.Simulate {
+		if meta.Enable.Simulate {
 			logger.Log(t, fmt.Sprintf("SIMULATION, the provisioning init & apply is not "+
 				"being invoked for %s", t.Name()))
 		} else {

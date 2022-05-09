@@ -34,11 +34,15 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 
+	var enablement = model.EnableConfig{
+		Simulate:         true,
+		RemoveAll:        false,
+		InstallEnabled:   false,
+		ProvisionEnabled: true,
+	}
+
 	var provisionMeta = model.ProvisionMeta{
-		Simulate:          false,
-		RemoveAll:         true,
-		InstallEnabled:    false,
-		ProvisionEnabled:  false,
+		Enable:            enablement,
 		ProvisionId:       "k8c-ReXIhb",
 		ArtifactsRootDir:  "/tmp/cloud-k8c-ReXIhb",
 		KubeConfigs:       nil,

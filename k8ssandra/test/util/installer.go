@@ -75,7 +75,7 @@ func installDataPlaneOperators(t *testing.T, meta model.ProvisionMeta, readiness
 
 		if !isControlPlane {
 			helmOptions := createHelmOptions(kubeConfig, map[string]string{
-				defaultControlPlaneKey: strconv.FormatBool(isControlPlane)}, kubeConfig.Env, meta.Simulate)
+				defaultControlPlaneKey: strconv.FormatBool(isControlPlane)}, kubeConfig.Env, meta.Enable.Simulate)
 
 			logger.Log(t, fmt.Sprintf("installing k8ssandra-operator on data-plane: %s", name))
 			installK8ssandraOperator(t, helmOptions, ctxConfig.Name, ctxConfig.Namespace, isClusterScoped, isControlPlane)
@@ -95,7 +95,7 @@ func installK8ssandraCluster(t *testing.T, meta model.ProvisionMeta, readinessCo
 
 			kubeConfig.Env[defaultControlPlaneKey] = "true"
 
-			if meta.Simulate {
+			if meta.Enable.Simulate {
 				logger.Log(t, fmt.Sprintf("=== SIMULATE deploying k8ssandra-cluster on control plane: %s", name))
 				continue
 			}
@@ -108,7 +108,7 @@ func installK8ssandraCluster(t *testing.T, meta model.ProvisionMeta, readinessCo
 			}, time.Second*30, defaultInterval, "timeout waiting for endpoint ip to exist")
 
 			logger.Log(t, "\n\nK8ssandra: control-plane k8c cluster deployment underway ...")
-			deployK8ssandraCluster(t, readinessConfig, ctxConfig.Name, kubeConfig, ctxConfig.Namespace, meta.Simulate)
+			deployK8ssandraCluster(t, readinessConfig, ctxConfig.Name, kubeConfig, ctxConfig.Namespace, meta.Enable.Simulate)
 
 			time.Sleep(defaultTimeout * 6)
 		}
@@ -150,7 +150,7 @@ func installControlPlaneOperator(t *testing.T, meta model.ProvisionMeta, readine
 
 			kubeConfig.Env[defaultControlPlaneKey] = strconv.FormatBool(isControlPlane)
 			helmOptions := createHelmOptions(kubeConfig, map[string]string{
-				defaultControlPlaneKey: strconv.FormatBool(isControlPlane)}, kubeConfig.Env, meta.Simulate)
+				defaultControlPlaneKey: strconv.FormatBool(isControlPlane)}, kubeConfig.Env, meta.Enable.Simulate)
 
 			installK8ssandraOperator(t, helmOptions, ctxConfig.Name, ctxConfig.Namespace, isClusterScoped, isControlPlane)
 			controlPlaneContextName = ctxOptions[name].FullName
@@ -250,16 +250,16 @@ func installSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.
 		SetCurrentContext(t, fullName, kubeConfig)
 
 		helmOptions := createHelmOptions(kubeConfig, map[string]string{}, map[string]string{},
-			meta.Simulate)
+			meta.Enable.Simulate)
 
 		if !isRepoSetup {
 			isRepoSetup = repoSetup(t, helmOptions)
 		}
 
-		installCertManager(t, kubeConfig, meta.Simulate)
+		installCertManager(t, kubeConfig, meta.Enable.Simulate)
 		contextConfigs[name] = kubeConfig
 
-		installTraefik(t, helmOptions, readinessConfig.Contexts[name], meta.Simulate)
+		installTraefik(t, helmOptions, readinessConfig.Contexts[name], meta.Enable.Simulate)
 	}
 
 	return CreateContextOptions(t, readinessConfig, meta, contextConfigs)
