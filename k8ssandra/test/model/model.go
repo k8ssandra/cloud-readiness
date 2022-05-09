@@ -111,10 +111,7 @@ type ContextTestManifest struct {
 }
 
 type ProvisionMeta struct {
-	Simulate          bool              `json:"simulate,omitempty"`
-	RemoveAll         bool              `json:"remove_all,omitempty"`
-	InstallEnabled    bool              `json:"install_enabled,omitempty"`
-	ProvisionEnabled  bool              `json:"provision_enabled,omitempty"`
+	Enable            EnableConfig      `json:"enable,omitempty"`
 	ProvisionId       string            `json:"provision_id,omitempty"`
 	KubeConfigs       map[string]string `json:"kube_configs,omitempty"`
 	ServiceAccount    string            `json:"service_account"`
@@ -122,6 +119,13 @@ type ProvisionMeta struct {
 	DefaultConfigPath string            `json:"default_config_path"`
 	DefaultConfigDir  string            `json:"default_config_dir"`
 	AdminIdentity     string            `json:"admin_identity"`
+}
+
+type EnableConfig struct {
+	Simulate         bool `json:"simulate,omitempty"`
+	RemoveAll        bool `json:"remove_all,omitempty"`
+	InstallEnabled   bool `json:"install_enabled,omitempty"`
+	ProvisionEnabled bool `json:"provision_enabled,omitempty"`
 }
 
 type ObjectMeta struct {

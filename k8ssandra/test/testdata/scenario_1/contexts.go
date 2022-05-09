@@ -24,12 +24,12 @@ import (
 func Contexts() map[string]model.ContextConfig {
 
 	// Traefik
-	networkConfig000 := model.NetworkConfig{
+	networkConfigCentral := model.NetworkConfig{
 		TraefikValuesFile: "k8c-traefik-bootz000.yaml",
 		TraefikVersion:    util.DefaultTraefikVersion,
 	}
 
-	networkConfig001 := model.NetworkConfig{
+	networkConfigEast := model.NetworkConfig{
 		TraefikValuesFile: "k8c-traefik-bootz001.yaml",
 		TraefikVersion:    util.DefaultTraefikVersion,
 	}
@@ -59,19 +59,19 @@ func Contexts() map[string]model.ContextConfig {
 
 	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "bootz3-central",
+		Name:          "bootz-c1",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
-		NetworkConfig: networkConfig000,
+		NetworkConfig: networkConfigCentral,
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "bootz3-east",
+		Name:          "bootz-e1",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},
-		NetworkConfig: networkConfig001,
+		NetworkConfig: networkConfigEast,
 	}
 
 	return map[string]model.ContextConfig{

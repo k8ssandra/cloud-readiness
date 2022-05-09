@@ -111,7 +111,7 @@ func removeArtifactsAndFolders(t *testing.T, meta model.ProvisionMeta, manifest 
 	}
 
 	if dir := regex.FindString(manifest.ModulesFolder); dir != "" {
-		if meta.Simulate {
+		if meta.Enable.Simulate {
 			logger.Log(t, fmt.Sprintf("SIMULATE removal of: %s", dir))
 			return true
 		}
@@ -133,7 +133,7 @@ func removeManifestFolder(t *testing.T, meta model.ProvisionMeta) {
 	if err == nil && regex != nil {
 		artifactsRootDir := meta.ArtifactsRootDir
 		if dir := regex.FindString(artifactsRootDir); dir != "" {
-			if !meta.Simulate {
+			if !meta.Enable.Simulate {
 
 				if err := os.RemoveAll(artifactsRootDir); err != nil {
 					logger.Log(t, fmt.Sprintf("WARNING: failed to clean up at: %s err: %v", artifactsRootDir, err))
