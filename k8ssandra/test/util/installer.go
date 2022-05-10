@@ -52,7 +52,7 @@ const (
 func InstallK8ssandra(t *testing.T, readinessConfig model.ReadinessConfig, meta model.ProvisionMeta) {
 
 	logger.Log(t, "\n\ninstallation started")
-	options := installSetup(t, meta, readinessConfig)
+	options := InstallSetup(t, meta, readinessConfig)
 
 	installControlPlaneOperator(t, meta, readinessConfig, options)
 	installDataPlaneOperators(t, meta, readinessConfig, options)
@@ -228,7 +228,7 @@ func installK8ssandraOperator(t *testing.T, options *helm.Options, contextName s
 
 }
 
-func installSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) map[string]model.ContextOption {
+func InstallSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) map[string]model.ContextOption {
 
 	identity := FetchEnv(t, meta.AdminIdentity)
 	require.NotEmpty(t, identity, "expecting identity to be provided to apply preconditions")

@@ -14,12 +14,12 @@
 
 # Create Compute Network for GKE
 resource "google_compute_network" "compute_network" {
-  name    = format("%s-network", var.name)
-  project = var.project_id
+  name                    = format("%s-network", var.name)
+  project                 = var.project_id
   # Always define custom subnetworks- one subnetwork per region isn't useful for an opinionated setup
   auto_create_subnetworks = "false"
   # A global routing mode can have an unexpected impact on load balancers; always use a regional mode
-  routing_mode = "REGIONAL"
+  routing_mode            = "REGIONAL"
 }
 
 # This Cloud Router is used only for the Cloud NAT.
@@ -38,13 +38,13 @@ resource "google_compute_router" "vpc_compute_router" {
 # create compute router NAT service
 resource "google_compute_router_nat" "compute_router_nat" {
   # Only create the Cloud NAT if it is enabled.
-  count   = var.enable_cloud_nat ? 1 : 0
-  name    = format("%s-nat", var.name)
-  project = var.project_id
+  count                  = var.enable_cloud_nat ? 1 : 0
+  name                   = format("%s-nat", var.name)
+  project                = var.project_id
   // Because router has the count attribute set we have to use [0] here to
   // refer to its attributes.
-  router = google_compute_router.vpc_compute_router[0].name
-  region = google_compute_router.vpc_compute_router[0].region
+  router                 = google_compute_router.vpc_compute_router[0].name
+  region                 = google_compute_router.vpc_compute_router[0].region
   nat_ip_allocate_option = "AUTO_ONLY"
 
   # Apply NAT to all IP ranges in the subnetwork.
@@ -67,7 +67,7 @@ resource "google_compute_subnetwork" "compute_subnetwork" {
   ip_cidr_range            = cidrsubnet(var.cidr_block, var.cidr_subnetwork_width_delta, 0)
 
   secondary_ip_range {
-    range_name = format("%s-subnet", var.name)
+    range_name    = format("%s-subnet", var.name)
     ip_cidr_range = cidrsubnet(
       var.secondary_cidr_block,
       var.secondary_cidr_subnetwork_width_delta,
@@ -159,4 +159,16 @@ resource "google_compute_firewall" "http_mgmt-api_firewall" {
     ports    = ["8080"]
   }
   target_tags = ["http"]
+}
+
+# Allow management api traffic
+resource "google_compute_firewall" "reaper_jmx_firewall" {
+  name    = format("%s-fw-reaper-jmx", var.name)
+  network = google_compute_network.compute_network.name
+  project = var.project_id
+  allow {
+    protocol = "tcp"
+    ports    = ["7199"]
+  }
+  target_tags = ["jmx"]
 }

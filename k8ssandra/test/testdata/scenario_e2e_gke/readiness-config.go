@@ -35,10 +35,11 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
 
 	var enablement = model.EnableConfig{
-		Simulate:         false,
-		RemoveAll:        false,
-		InstallEnabled:   false,
-		ProvisionEnabled: true,
+		Simulate:        false,
+		RemoveAll:       false,
+		Install:         false,
+		ProvisionInfra:  true,
+		PreInstallSetup: true,
 	}
 
 	var provisionMeta = model.ProvisionMeta{

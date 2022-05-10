@@ -32,6 +32,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -55,9 +56,10 @@ const (
 	DefaultTraefikVersion  = "v10.3.2"
 )
 
-func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, provisionMeta model.ProvisionMeta) model.ProvisionMeta {
+func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig,
+	provisionMeta model.ProvisionMeta) model.ProvisionMeta {
 
-	uniqueProvisionId := random.UniqueId()
+	uniqueProvisionId := strings.ToLower(random.UniqueId())
 	testFolderName := path.Join(os.TempDir(), prefixFolderName+uniqueProvisionId)
 
 	var meta = model.ProvisionMeta{
@@ -97,7 +99,7 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig, 
 		gcp.Switch(t, identity, env)
 		ts.SaveTestData(t, testPath, testData)
 
-		provisionCluster(t, name, options, meta)
+		provisionCluster(t, name, options, meta, readinessConfig)
 	}
 	return meta
 }
@@ -139,7 +141,7 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 }
 
 func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform.Options,
-	meta model.ProvisionMeta) {
+	meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
 	if files.FileExists(meta.DefaultConfigPath) {
 		logger.Log(t, fmt.Sprintf("backing up existing kube config file: %s", meta.DefaultConfigPath))
@@ -147,17 +149,45 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
 
-	provisionSuccess := t.Run(name, func(t *testing.T) {
+	// t.Setenv("test.timeout", 0)
+	t.Setenv("test.v", "true")
+	t.Setenv("test.trace", path.Join(meta.ArtifactsRootDir, "trace-x"))
+
+	timeout, _ := t.Deadline()
+	logger.Log(t, fmt.Sprintf("executing test:"+
+		"%s with timeout: %d(m)",
+		t.Name(), timeout.UnixMilli()))
+
+	testRun := t.Run(name, func(t *testing.T) {
 		t.Parallel()
 		if meta.Enable.Simulate {
-			logger.Log(t, fmt.Sprintf("SIMULATION, the provisioning init & apply is not "+
-				"being invoked for %s", t.Name()))
+			timeout, _ := t.Deadline()
+			logger.Log(t, fmt.Sprintf("SIMULATION, init, plan, and apply being invoked for:"+
+				"%s with timeout: %d(m)", t.Name(), timeout.UnixMilli()))
+
 		} else {
-			logger.Log(t, fmt.Sprintf("apply being invoked for name: %s", name))
-			apply(t, tfOptions[name])
+			logger.Log(t, fmt.Sprintf("init, plan and apply being invoked for: %s", name))
+			planErr, applyErr := apply(t, tfOptions[name])
+
+			if planErr != nil || applyErr != nil {
+				logger.Log(t, fmt.Sprintf("provision: %s, failure discovered. plan err reported: %s apply "+
+					"err reported: %s", name, planErr, applyErr))
+				// TODO indicate to the test client a failure overall, IF we can determine that there is an actual
+				// issue with the TF activities or it was simply a timeout on that side.
+			}
+		}
+
+		if meta.Enable.PreInstallSetup {
+			if meta.Enable.Simulate {
+				logger.Log(t, fmt.Sprintf("SIMULATION, post install resources requested for: %s", name))
+			} else {
+				logger.Log(t, fmt.Sprintf("pre-install setup requested for: %s", name))
+				InstallSetup(t, meta, readinessConfig)
+			}
 		}
 	})
-	logger.Log(t, fmt.Sprintf("provision: %s success: %s", name, strconv.FormatBool(provisionSuccess)))
+	logger.Log(t, fmt.Sprintf("test run: %s reported success as: %s", name, strconv.FormatBool(testRun)))
+
 }
 
 func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string,
@@ -178,12 +208,13 @@ func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string,
 	return helmOptions
 }
 
-func apply(t *testing.T, options *terraform.Options) {
+func apply(t *testing.T, options *terraform.Options) (error, error) {
 
-	terraform.InitAndPlan(t, options)
+	_, initPlanErr := terraform.InitAndPlanE(t, options)
 	logger.Log(t, fmt.Sprintf("initialized and planned: %s", t.Name()))
 
-	terraform.Apply(t, options)
+	_, applyErr := terraform.ApplyE(t, options)
 	logger.Log(t, fmt.Sprintf("applied: %s", t.Name()))
 
+	return initPlanErr, applyErr
 }

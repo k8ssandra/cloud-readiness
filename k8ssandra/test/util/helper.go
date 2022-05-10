@@ -52,25 +52,25 @@ const (
 func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
 	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Enable.Simulate)))
-	if meta.Enable.RemoveAll && !meta.Enable.InstallEnabled && !meta.Enable.ProvisionEnabled {
+	if meta.Enable.RemoveAll && !meta.Enable.Install && !meta.Enable.ProvisionInfra {
 
 		logger.Log(t, fmt.Sprintf("remove all requested, existing infrastructure provisioning "+
 			"is being referenced: %s. Starting artifact removal.", meta.ArtifactsRootDir))
 		RemoveProvisioningArtifacts(t, meta, readinessConfig, true)
 
-	} else if meta.Enable.ProvisionEnabled && !meta.Enable.InstallEnabled {
+	} else if meta.Enable.ProvisionInfra && !meta.Enable.Install {
 		logger.Log(t, fmt.Sprintf("existing infrastructure provisioning is not being referenced, "+
 			"provision started %s", meta.ProvisionId))
 		meta = ProvisionMultiCluster(t, readinessConfig, meta)
 		require.NotEmpty(t, meta.ProvisionId, "expected provision step to occur.")
 
-	} else if meta.Enable.InstallEnabled && !meta.Enable.ProvisionEnabled {
+	} else if meta.Enable.Install && !meta.Enable.ProvisionInfra {
 		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
 		InstallK8ssandra(t, readinessConfig, meta)
 
 	} else {
 		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply "+
-			"(e.g. InstallEnabled, ProvisionEnabled, RemoveAll)."))
+			"(e.g. Install, ProvisionInfra, RemoveAll)."))
 	}
 
 }
