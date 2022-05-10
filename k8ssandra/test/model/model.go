@@ -122,10 +122,11 @@ type ProvisionMeta struct {
 }
 
 type EnableConfig struct {
-	Simulate         bool `json:"simulate,omitempty"`
-	RemoveAll        bool `json:"remove_all,omitempty"`
-	InstallEnabled   bool `json:"install_enabled,omitempty"`
-	ProvisionEnabled bool `json:"provision_enabled,omitempty"`
+	Simulate        bool `json:"simulate,omitempty"`
+	RemoveAll       bool `json:"remove_all,omitempty"`
+	Install         bool `json:"install_enabled,omitempty"`
+	ProvisionInfra  bool `json:"provision_enabled,omitempty"`
+	PreInstallSetup bool `json:"pre_install_setup,omitempty"`
 }
 
 type ObjectMeta struct {

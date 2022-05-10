@@ -59,7 +59,7 @@ func Contexts() map[string]model.ContextConfig {
 
 	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "bootz-c1",
+		Name:          "rio-c1",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
@@ -67,7 +67,7 @@ func Contexts() map[string]model.ContextConfig {
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "bootz-e1",
+		Name:          "rio-e1",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},
