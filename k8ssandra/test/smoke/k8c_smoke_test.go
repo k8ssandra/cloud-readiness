@@ -23,13 +23,6 @@ import (
 )
 
 func TestK8cSmoke(t *testing.T) {
-
-	// 1. Collect context specific to scenario
-	contexts := Contexts()
-
-	// 2. Construct a cloud-readiness model w/ provisioning metadata.
-	meta, config := ReadinessConfig(t, contexts)
-
-	// 3. Apply desired activities based on model and metadata.
+	meta, config := ReadinessConfig(t, Contexts())
 	Apply(t, meta, config)
 }
