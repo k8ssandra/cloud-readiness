@@ -149,10 +149,6 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 		require.NoError(t, cpErr, "expecting backup of default config file")
 	}
 
-	// t.Setenv("test.timeout", 0)
-	t.Setenv("test.v", "true")
-	t.Setenv("test.trace", path.Join(meta.ArtifactsRootDir, "trace-x"))
-
 	timeout, _ := t.Deadline()
 	logger.Log(t, fmt.Sprintf("executing test:"+
 		"%s with timeout: %d(m)",
@@ -167,6 +163,7 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 
 		} else {
 			logger.Log(t, fmt.Sprintf("init, plan and apply being invoked for: %s", name))
+
 			planErr, applyErr := apply(t, tfOptions[name])
 
 			if planErr != nil || applyErr != nil {
