@@ -32,7 +32,7 @@ This flexibility is important for troubleshooting needs or for development of a 
 
 Test cases will utilize the Terraform modules for the cloud-specific platform setup and provisioning.  For example when needing a specific cluster, storage, IAM, network settings, etc.
 
-To get started, checkout the repository, customize the [smoke test template](https://github.com/k8ssandra/cloud-readiness/blob/main/k8ssandra/test/smoke/template_k8c_smoke_test.go) based on your GCP configuration.
+To get started, checkout the repository and follow along in the cloud-readiness [user-guide](https://github.com/k8ssandra/cloud-readiness/blob/main/docs/user-guide.md) based on your GCP configuration.
 
 Once the test file has your specific settings, issue `go test -v` from the smoke test folder to kickoff the provisioning activities.
 
