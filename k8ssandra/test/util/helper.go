@@ -67,7 +67,8 @@ func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.Readine
 	} else if meta.Enable.Install && !meta.Enable.ProvisionInfra {
 		logger.Log(t, fmt.Sprintf("installation starting for provision identifier: %s", meta.ProvisionId))
 		InstallK8ssandra(t, readinessConfig, meta)
-
+	} else if meta.Enable.PreInstallSetup && !meta.Enable.ProvisionInfra {
+		PreInstallSetup(t, meta, readinessConfig)
 	} else {
 		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply "+
 			"(e.g. Install, ProvisionInfra, RemoveAll).  It may be required that another enablement is causing conflict."))

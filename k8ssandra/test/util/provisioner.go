@@ -178,18 +178,22 @@ func provisionCluster(t *testing.T, name string, tfOptions *terraform.Options,
 		}
 
 		if meta.Enable.PreInstallSetup {
-			if meta.Enable.Simulate {
-				logger.Log(t, fmt.Sprintf("SIMULATION, post install resources requested for: %s", name))
-			} else {
-				logger.Log(t, fmt.Sprintf("pre-install setup requested for: %s", name))
-				InstallSetup(t, meta, readinessConfig)
-			}
+			PreInstallSetup(t, meta, readinessConfig)
 		} else {
 			logger.Log(t, fmt.Sprintf("No pre-install setup requested for: %s", name))
 		}
 	})
 	logger.Log(t, fmt.Sprintf("test run: %s reported success as: %s", name, strconv.FormatBool(testRun)))
 
+}
+
+func PreInstallSetup(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
+	if meta.Enable.Simulate {
+		logger.Log(t, fmt.Sprintf("SIMULATION, pre-install setup requested"))
+	} else {
+		logger.Log(t, fmt.Sprintf("pre-install setup requested."))
+		InstallSetup(t, meta, readinessConfig)
+	}
 }
 
 func createHelmOptions(kubeConfig *k8s.KubectlOptions, values map[string]string, envs map[string]string,
