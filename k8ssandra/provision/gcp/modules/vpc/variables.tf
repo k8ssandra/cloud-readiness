@@ -41,7 +41,6 @@ variable "region" {
 
 variable "cidr_block" {
   description = "The IP address range of the VPC in CIDR notation. A prefix of /16 is recommended. Do not use a prefix higher than /27."
-  default     = "10.0.0.0/16"
   type        = string
 }
 
@@ -60,7 +59,6 @@ variable "cidr_subnetwork_spacing" {
 variable "secondary_cidr_block" {
   description = "The IP address range of the VPC's secondary address range in CIDR notation. A prefix of /16 is recommended. Do not use a prefix higher than /27."
   type        = string
-  default     = "10.1.0.0/16"
 }
 
 variable "secondary_cidr_subnetwork_width_delta" {

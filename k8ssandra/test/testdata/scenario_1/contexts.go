@@ -23,15 +23,21 @@ import (
 
 func Contexts() map[string]model.ContextConfig {
 
-	// Traefik
+	// Network specific
 	networkConfigCentral := model.NetworkConfig{
-		TraefikValuesFile: "k8c-traefik-bootz000.yaml",
-		TraefikVersion:    util.DefaultTraefikVersion,
+		TraefikValuesFile:   "k8c-traefik-bootz000.yaml",
+		TraefikVersion:      util.DefaultTraefikVersion,
+		SubnetCidrBlock:     "10.1.32.0/16",
+		SecondaryCidrBlock:  "10.3.32.0/20",
+		MasterIpv4CidrBlock: "10.0.0.0/21",
 	}
 
 	networkConfigEast := model.NetworkConfig{
-		TraefikValuesFile: "k8c-traefik-bootz001.yaml",
-		TraefikVersion:    util.DefaultTraefikVersion,
+		TraefikValuesFile:   "k8c-traefik-bootz001.yaml",
+		TraefikVersion:      util.DefaultTraefikVersion,
+		SubnetCidrBlock:     "10.2.32.0/16",
+		SecondaryCidrBlock:  "10.4.32.0/20",
+		MasterIpv4CidrBlock: "10.0.0.0/21",
 	}
 
 	// Cloud specific
@@ -59,7 +65,7 @@ func Contexts() map[string]model.ContextConfig {
 
 	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "rio-c1",
+		Name:          "rio-c10000",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
@@ -67,7 +73,7 @@ func Contexts() map[string]model.ContextConfig {
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "rio-e1",
+		Name:          "rio-e10000",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},

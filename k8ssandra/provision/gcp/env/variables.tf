@@ -29,6 +29,13 @@ variable "master_ipv4_cidr_block" {
   default = "top-level"
 }
 
+variable "cidr_block" {
+  default = "top-level"
+}
+variable "secondary_cidr_block" {
+  default = "top-level"
+}
+
 variable "service_account" {
   default = "top-level"
 }

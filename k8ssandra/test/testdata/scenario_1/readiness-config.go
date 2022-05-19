@@ -39,13 +39,13 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 		RemoveAll:       false,
 		Install:         false,
 		ProvisionInfra:  true,
-		PreInstallSetup: true,
+		PreInstallSetup: false,
 	}
 
 	var provisionMeta = model.ProvisionMeta{
 		Enable:            enablement,
-		ProvisionId:       "",
-		ArtifactsRootDir:  "",
+		ProvisionId:       "k8c-nRfZyJ",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-nRfZyJ",
 		KubeConfigs:       nil,
 		ServiceAccount:    "",
 		DefaultConfigPath: configPath,

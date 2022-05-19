@@ -52,8 +52,11 @@ type K8cConfig struct {
 }
 
 type NetworkConfig struct {
-	TraefikValuesFile string `json:"traefik_values_file,omitempty"`
-	TraefikVersion    string `json:"traefik_version"`
+	TraefikValuesFile   string `json:"traefik_values_file,omitempty"`
+	TraefikVersion      string `json:"traefik_version"`
+	SubnetCidrBlock     string `json:"subnetCidrBlock"`
+	MasterIpv4CidrBlock string `json:"master_ipv_4_cidr_block"`
+	SecondaryCidrBlock  string `json:"secondary_cidr_block"`
 }
 
 type ProvisionConfig struct {
@@ -106,8 +109,9 @@ type ContextServiceAccount struct {
 }
 
 type ContextTestManifest struct {
-	Name          string `json:"name"`
-	ModulesFolder string `json:"modules_folder"`
+	Name            string          `json:"name"`
+	ModulesFolder   string          `json:"modules_folder"`
+	ReadinessConfig ReadinessConfig `json:"readiness_config,omitempty"`
 }
 
 type ProvisionMeta struct {

@@ -71,29 +71,32 @@ func removeTempArtifacts(t *testing.T, meta model.ProvisionMeta, readinessConfig
 
 	for _, artifact := range artifacts {
 
-		logger.Log(t, fmt.Sprintf("removing tmp artifacts in dir: %s for artifact: %s",
-			meta.ArtifactsRootDir, artifact.Name()))
-		if tdPath := ts.FormatTestDataPath(meta.ArtifactsRootDir, artifact.Name()); tdPath != "" &&
-			files.IsExistingDir(tdPath) {
+		artifactPath := ts.FormatTestDataPath(meta.ArtifactsRootDir, artifact.Name())
+		logger.Log(t, fmt.Sprintf("removing tmp artifacts in dir: %s for artifact: %s looking for: %s",
+			meta.ArtifactsRootDir, artifact.Name(), artifactPath))
 
-			logger.Log(t, fmt.Sprintf("Test data artifacts located, checking for manifest file in path: %s", tdPath))
+		if artifactPath != "" && files.IsExistingFile(artifactPath) {
+
+			logger.Log(t, fmt.Sprintf("Test data artifacts located, checking for manifest file in "+
+				"path: %s", artifactPath))
 			manifest := &model.ContextTestManifest{}
-			ts.LoadTestData(t, tdPath, manifest)
+			ts.LoadTestData(t, artifactPath, manifest)
 
 			if manifest != nil && manifest.ModulesFolder != "" {
 
 				var isResourceCleanupComplete = false
 				if isCloudCleanRequested {
-					tfOptions := CreateOptions(meta, readinessConfig, path.Join(manifest.ModulesFolder,
-						defaultTestSubFolder), meta.DefaultConfigPath)
-					isResourceCleanupComplete = Cleanup(t, meta, manifest.Name, tfOptions)
+					contextConfig := readinessConfig.Contexts[artifact.Name()]
+					tfOptions := CreateTerraformOptions(meta, readinessConfig, artifact.Name(),
+						contextConfig, meta.DefaultConfigPath, path.Join(manifest.ModulesFolder, defaultTestSubFolder))
+					isResourceCleanupComplete = Cleanup(t, meta, manifest.Name, &tfOptions)
 				}
 
 				if !isCloudCleanRequested || isResourceCleanupComplete {
 					isSuccess = removeArtifactsAndFolders(t, meta, manifest)
 					if !isSuccess {
 						logger.Log(t, fmt.Sprintf("WARNING: failed to locate the test data "+
-							"for artifact: %s in the /tmp folder", tdPath))
+							"for artifact: %s in the /tmp folder", artifactPath))
 					}
 				}
 			}

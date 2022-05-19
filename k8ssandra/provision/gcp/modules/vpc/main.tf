@@ -13,26 +13,30 @@
 # limitations under the License.
 
 # Create Compute Network for GKE
-resource "google_compute_network" "compute_network" {
-  name                    = format("%s-network", var.name)
-  project                 = var.project_id
-  # Always define custom subnetworks- one subnetwork per region isn't useful for an opinionated setup
-  auto_create_subnetworks = "false"
-  # A global routing mode can have an unexpected impact on load balancers; always use a regional mode
-  routing_mode            = "REGIONAL"
+#resource "google_compute_network" "compute_network" {
+#  name                    = format("%s-network", var.project_id)
+#  project                 = var.project_id
+#  # Always define custom subnetworks- one subnetwork per region isn't useful for an opinionated setup
+#  auto_create_subnetworks = "false"
+#  # A global routing mode can have an unexpected impact on load balancers; always use a regional mode
+#  routing_mode            = "REGIONAL"
+#}
+data "google_compute_network" "compute_network" {
+  name = "community-ecosystem-network"
+  project = var.project_id
 }
 
 # This Cloud Router is used only for the Cloud NAT.
 resource "google_compute_router" "vpc_compute_router" {
   # Only create the Cloud NAT if it is enabled.
   depends_on = [
-    google_compute_network.compute_network
+    data.google_compute_network.compute_network
   ]
   count   = var.enable_cloud_nat ? 1 : 0
   name    = format("%s-router", var.name)
   project = var.project_id
   region  = var.region
-  network = google_compute_network.compute_network.self_link
+  network =  data.google_compute_network.compute_network.id
 }
 
 # create compute router NAT service
@@ -47,9 +51,12 @@ resource "google_compute_router_nat" "compute_router_nat" {
   region                 = google_compute_router.vpc_compute_router[0].region
   nat_ip_allocate_option = "AUTO_ONLY"
 
-  # Apply NAT to all IP ranges in the subnetwork.
-  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
-
+  source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
+  subnetwork {
+    name                    = google_compute_subnetwork.compute_subnetwork.name
+    source_ip_ranges_to_nat = ["LIST_OF_SUBNETWORKS"]
+  }
+  
   log_config {
     enable = var.enable_cloud_nat_logging
     filter = var.cloud_nat_logging_filter
@@ -60,7 +67,7 @@ resource "google_compute_router_nat" "compute_router_nat" {
 resource "google_compute_subnetwork" "compute_subnetwork" {
   name    = format("%s-subnet", var.name)
   project = var.project_id
-  network = google_compute_network.compute_network.self_link
+  network =  data.google_compute_network.compute_network.id
   region  = var.region
 
   private_ip_google_access = true
@@ -80,7 +87,7 @@ resource "google_compute_subnetwork" "compute_subnetwork" {
 # Allow http traffic
 resource "google_compute_firewall" "http_compute_firewall" {
   name    = format("%s-fw-allow-http", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -92,7 +99,7 @@ resource "google_compute_firewall" "http_compute_firewall" {
 # Allow https traffic
 resource "google_compute_firewall" "https_compute_firewall" {
   name    = format("%s-fw-allow-https", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -104,7 +111,7 @@ resource "google_compute_firewall" "https_compute_firewall" {
 # Allow ssh traffic
 resource "google_compute_firewall" "ssh_compute_firewall" {
   name    = format("%s-fw-allow-ssh", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -117,7 +124,7 @@ resource "google_compute_firewall" "ssh_compute_firewall" {
 # Allow rdp traffic
 resource "google_compute_firewall" "rdp_compute_firewall" {
   name    = format("%s-fw-allow-rdp", var.name)
-  network = google_compute_network.compute_network.name
+  network = data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -129,7 +136,7 @@ resource "google_compute_firewall" "rdp_compute_firewall" {
 # Allow gossiper traffic
 resource "google_compute_firewall" "http_gossip_firewall" {
   name    = format("%s-fw-gossip-http", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -140,7 +147,7 @@ resource "google_compute_firewall" "http_gossip_firewall" {
 
 resource "google_compute_firewall" "https_gossip_firewall" {
   name    = format("%s-fw-gossip-https", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -152,7 +159,7 @@ resource "google_compute_firewall" "https_gossip_firewall" {
 # Allow management api traffic
 resource "google_compute_firewall" "http_mgmt-api_firewall" {
   name    = format("%s-fw-mgmt-api-http", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"
@@ -164,7 +171,7 @@ resource "google_compute_firewall" "http_mgmt-api_firewall" {
 # Allow management api traffic
 resource "google_compute_firewall" "reaper_jmx_firewall" {
   name    = format("%s-fw-reaper-jmx", var.name)
-  network = google_compute_network.compute_network.name
+  network =  data.google_compute_network.compute_network.id
   project = var.project_id
   allow {
     protocol = "tcp"

@@ -52,7 +52,7 @@ const (
 func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
 	logger.Log(t, fmt.Sprintf("SIMULATE mode: %s", strconv.FormatBool(meta.Enable.Simulate)))
-	if meta.Enable.RemoveAll && !meta.Enable.Install && !meta.Enable.ProvisionInfra {
+	if meta.Enable.RemoveAll {
 
 		logger.Log(t, fmt.Sprintf("remove all requested, existing infrastructure provisioning "+
 			"is being referenced: %s. Starting artifact removal.", meta.ArtifactsRootDir))
@@ -70,58 +70,51 @@ func Apply(t *testing.T, meta model.ProvisionMeta, readinessConfig model.Readine
 
 	} else {
 		logger.Log(t, fmt.Sprintf("NOTICE: a single meta activity is not provided for apply "+
-			"(e.g. Install, ProvisionInfra, RemoveAll)."))
+			"(e.g. Install, ProvisionInfra, RemoveAll).  It may be required that another enablement is causing conflict."))
 	}
 
 }
 
-// CreateOptions constructs Terraform options, which include kubeConfig path.
-// Names for cluster, service account, and buckets are made to be specific based on the ID provided.
-// Used for provisioning with
-func CreateOptions(meta model.ProvisionMeta, config model.ReadinessConfig, rootFolder string,
-	kubeConfigPath string) map[string]*terraform.Options {
+func CreateTerraformOptions(meta model.ProvisionMeta, config model.ReadinessConfig,
+	name string, ctx model.ContextConfig, kubeConfigPath string, rootFolder string) terraform.Options {
 
-	var tfOptions = map[string]*terraform.Options{}
-	for name, ctx := range config.Contexts {
+	uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
+	saName := gcp.ConstructCloudClusterName(name, ctx.CloudConfig) + "-" +
+		config.ServiceAccountNameSuffix + defaultIdentityDomain
 
-		uniqueClusterName := strings.ToLower(fmt.Sprintf(name))
-		saName := gcp.ConstructCloudClusterName(name, ctx.CloudConfig) + "-" +
-			config.ServiceAccountNameSuffix + defaultIdentityDomain
-
-		uniqueBucketName := strings.ToLower(fmt.Sprintf(ctx.CloudConfig.Bucket+"-%s", config.UniqueId))
-
-		vars := map[string]interface{}{
-			"project_id":              ctx.CloudConfig.Project,
-			"name":                    uniqueClusterName,
-			"machine_type":            ctx.CloudConfig.MachineType,
-			"environment":             ctx.CloudConfig.Environment,
-			"provision_id":            meta.ProvisionId,
-			"region":                  ctx.CloudConfig.Region,
-			"zone":                    ctx.CloudConfig.Region,
-			"node_locations":          ctx.CloudConfig.Locations,
-			"kubectl_config_path":     kubeConfigPath,
-			"initial_node_count":      config.ExpectedNodeCount,
-			"cluster_name":            uniqueClusterName,
-			"service_account":         saName,
-			"enable_private_endpoint": false,
-			"enable_private_nodes":    false,
-			"master_ipv4_cidr_block":  "10.0.0.0/28",
-			"bucket_policy_only":      true,
-			"role":                    "roles/storage.admin",
-			ctx.CloudConfig.Bucket:    uniqueBucketName,
-		}
-
-		envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": ctx.CloudConfig.CredPath,
-			defaultControlPlaneKey: strconv.FormatBool(IsControlPlane(config.Contexts[name]))}
-
-		options := terraform.Options{
-			TerraformDir: rootFolder,
-			Vars:         vars,
-			EnvVars:      envVars,
-		}
-		tfOptions[name] = &options
+	uniqueBucketName := strings.ToLower(fmt.Sprintf(ctx.CloudConfig.Bucket+"-%s", config.UniqueId))
+	vars := map[string]interface{}{
+		"project_id":              ctx.CloudConfig.Project,
+		"name":                    uniqueClusterName,
+		"machine_type":            ctx.CloudConfig.MachineType,
+		"environment":             ctx.CloudConfig.Environment,
+		"provision_id":            meta.ProvisionId,
+		"region":                  ctx.CloudConfig.Region,
+		"zone":                    ctx.CloudConfig.Region,
+		"node_locations":          ctx.CloudConfig.Locations,
+		"kubectl_config_path":     kubeConfigPath,
+		"initial_node_count":      config.ExpectedNodeCount,
+		"cluster_name":            uniqueClusterName,
+		"service_account":         saName,
+		"enable_private_endpoint": false,
+		"enable_private_nodes":    false,
+		"cidr_block":              ctx.NetworkConfig.SubnetCidrBlock,
+		"secondary_cidr_block":    ctx.NetworkConfig.SecondaryCidrBlock,
+		"master_ipv4_cidr_block":  ctx.NetworkConfig.MasterIpv4CidrBlock,
+		"bucket_policy_only":      true,
+		"role":                    "roles/storage.admin",
+		ctx.CloudConfig.Bucket:    uniqueBucketName,
 	}
-	return tfOptions
+
+	envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": ctx.CloudConfig.CredPath,
+		defaultControlPlaneKey: strconv.FormatBool(IsControlPlane(config.Contexts[name]))}
+
+	return terraform.Options{
+		TerraformDir: rootFolder,
+		Vars:         vars,
+		EnvVars:      envVars,
+	}
+
 }
 
 func IsControlPlane(ctxConfig model.ContextConfig) bool {
