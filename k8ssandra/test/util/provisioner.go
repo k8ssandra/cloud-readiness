@@ -85,12 +85,13 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig,
 
 		modulesFolder := ts.CopyTerraformFolderToTemp(t, defaultRelativeRootFolder, tfConfig.ModuleFolder)
 
-		options := CreateOptions(meta, readinessConfig, path.Join(modulesFolder, defaultTestSubFolder),
-			meta.DefaultConfigPath)
+		options := CreateTerraformOptions(meta, readinessConfig, name, ctx,
+			meta.DefaultConfigPath, path.Join(modulesFolder, defaultTestSubFolder))
 
 		testData := model.ContextTestManifest{
-			Name:          ctx.Name,
-			ModulesFolder: modulesFolder,
+			Name:            ctx.Name,
+			ModulesFolder:   modulesFolder,
+			ReadinessConfig: readinessConfig,
 		}
 
 		identity := FetchEnv(t, meta.AdminIdentity)
@@ -99,12 +100,12 @@ func ProvisionMultiCluster(t *testing.T, readinessConfig model.ReadinessConfig,
 		gcp.Switch(t, identity, env)
 		ts.SaveTestData(t, testPath, testData)
 
-		provisionCluster(t, name, options, meta, readinessConfig)
+		provisionCluster(t, name, &options, meta, readinessConfig)
 	}
 	return meta
 }
 
-func Cleanup(t *testing.T, meta model.ProvisionMeta, name string, options map[string]*terraform.Options) bool {
+func Cleanup(t *testing.T, meta model.ProvisionMeta, name string, options *terraform.Options) bool {
 
 	logger.Log(t, fmt.Sprintf("cleanup started for resources in: %s", name))
 
@@ -113,20 +114,22 @@ func Cleanup(t *testing.T, meta model.ProvisionMeta, name string, options map[st
 		return true
 	}
 
-	initPlanOut, initPlanErr := terraform.InitAndPlanE(t, options[name])
-	if initPlanErr != nil {
-		logger.Log(t, fmt.Sprintf("failed cleanup on init-plan, error: %s", initPlanErr.Error()))
+	initOut, initErr := terraform.InitE(t, options)
+	// initPlanOut, initPlanErr := terraform.InitAndPlanE(t, options)
+	if initErr != nil {
+		logger.Log(t, fmt.Sprintf("failed cleanup on init, error: %s", initErr.Error()))
 		return false
 	}
-	logger.Log(t, fmt.Sprintf("successful cleanup init-plan, output: %s", initPlanOut))
+	logger.Log(t, fmt.Sprintf("successful cleanup init-plan, output: %s", initOut))
 
-	destroyOut, destroyErr := terraform.DestroyE(t, options[name])
+	destroyOut, destroyErr := terraform.DestroyE(t, options)
 	if destroyErr != nil {
 		logger.Log(t, fmt.Sprintf("failed cleanup destroy, error: %s", destroyErr.Error()))
-	} else {
-		logger.Log(t, fmt.Sprintf("successful cleanup destroy, output: %s", destroyOut))
+		return false
 	}
-	return destroyErr == nil
+
+	logger.Log(t, fmt.Sprintf("successful cleanup destroy, output: %s", destroyOut))
+	return true
 }
 
 func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
@@ -140,7 +143,7 @@ func initTempArtifacts(t *testing.T, meta model.ProvisionMeta) {
 	require.NoError(t, mkdirErr, fmt.Sprintf("failed to init folder: %s", rootTempDir))
 }
 
-func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform.Options,
+func provisionCluster(t *testing.T, name string, tfOptions *terraform.Options,
 	meta model.ProvisionMeta, readinessConfig model.ReadinessConfig) {
 
 	if files.FileExists(meta.DefaultConfigPath) {
@@ -164,7 +167,7 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 		} else {
 			logger.Log(t, fmt.Sprintf("init, plan and apply being invoked for: %s", name))
 
-			planErr, applyErr := apply(t, tfOptions[name])
+			planErr, applyErr := apply(t, tfOptions)
 
 			if planErr != nil || applyErr != nil {
 				logger.Log(t, fmt.Sprintf("provision: %s, failure discovered. plan err reported: %s apply "+
@@ -181,6 +184,8 @@ func provisionCluster(t *testing.T, name string, tfOptions map[string]*terraform
 				logger.Log(t, fmt.Sprintf("pre-install setup requested for: %s", name))
 				InstallSetup(t, meta, readinessConfig)
 			}
+		} else {
+			logger.Log(t, fmt.Sprintf("No pre-install setup requested for: %s", name))
 		}
 	})
 	logger.Log(t, fmt.Sprintf("test run: %s reported success as: %s", name, strconv.FormatBool(testRun)))

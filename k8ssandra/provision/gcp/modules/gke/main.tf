@@ -69,6 +69,7 @@ resource "google_container_node_pool" "container_node_pool" {
   name       = format("%s-node-pool", var.name)
   project    = var.project_id
   location   = var.region
+  node_locations = var.node_locations
   cluster    = google_container_cluster.container_cluster.name
   node_count = var.initial_node_count
 
@@ -82,7 +83,6 @@ resource "google_container_node_pool" "container_node_pool" {
       disable-legacy-endpoints = "true"
     }
     labels = {
-
     }
 
     service_account = var.service_account

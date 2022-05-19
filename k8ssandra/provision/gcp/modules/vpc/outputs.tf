@@ -15,7 +15,7 @@
 # Output variable for the vpc network selflink.
 output "network_selflink" {
   description = "variable for the vpc network selflink"
-  value       = google_compute_network.compute_network.self_link
+  value       = data.google_compute_network.compute_network.self_link
 }
 
 # Output variable for the subnetwork selflink. 

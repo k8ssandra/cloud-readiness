@@ -18,6 +18,8 @@ module "vpc" {
   environment  = var.environment
   region       = var.region
   project_id   = var.project_id
+  cidr_block = var.cidr_block
+  secondary_cidr_block = var.secondary_cidr_block
 }
 
 module "gke" {
@@ -33,6 +35,7 @@ module "gke" {
   network_link       = module.vpc.network_selflink
   subnetwork_link    = module.vpc.subnetwork_selflink
   service_account    = module.iam.service_account
+  master_ipv4_cidr_block = var.master_ipv4_cidr_block
 }
 
 module "iam" {
