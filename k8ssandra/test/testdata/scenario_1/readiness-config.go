@@ -38,8 +38,8 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 		Simulate:        false,
 		RemoveAll:       false,
 		Install:         false,
-		ProvisionInfra:  true,
-		PreInstallSetup: false,
+		ProvisionInfra:  false,
+		PreInstallSetup: true,
 	}
 
 	var provisionMeta = model.ProvisionMeta{
