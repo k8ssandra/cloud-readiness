@@ -76,18 +76,25 @@ Inside the Contexts() function, the network definitions will be referenced.  In 
 
 
 #### Network model
+Network specific settings for 3rd party ingress and egress rules as well as CIDR blocks.
 
-
-```golang
+```golang	
 networkConfigCentral := model.NetworkConfig{
-    TraefikValuesFile: "k8c-traefik-bootz000.yaml",
-    TraefikVersion:    util.DefaultTraefikVersion,
+    TraefikValuesFile:   "k8c-traefik-bootz000.yaml",
+    TraefikVersion:      util.DefaultTraefikVersion,
+    SubnetCidrBlock:     "10.1.32.0/16",
+    SecondaryCidrBlock:  "10.3.32.0/20",
+    MasterIpv4CidrBlock: "10.0.0.0/21",
 }
 
 networkConfigEast := model.NetworkConfig{
-    TraefikValuesFile: "k8c-traefik-bootz001.yaml",
-    TraefikVersion:    util.DefaultTraefikVersion,
+    TraefikValuesFile:   "k8c-traefik-bootz001.yaml",
+    TraefikVersion:      util.DefaultTraefikVersion,
+    SubnetCidrBlock:     "10.2.32.0/16",
+    SecondaryCidrBlock:  "10.4.32.0/20",
+    MasterIpv4CidrBlock: "10.0.0.0/21",
 }
+
 ```
 
 
