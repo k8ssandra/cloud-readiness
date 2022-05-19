@@ -23,54 +23,61 @@ import (
 
 func Contexts() map[string]model.ContextConfig {
 
-	networkConfigUsEast := model.NetworkConfig{
-		TraefikValuesFile: "k8c-traefik-bootz000.yaml",
-		TraefikVersion:    util.DefaultTraefikVersion,
+	// Network specific
+	networkConfigCentral := model.NetworkConfig{
+		TraefikValuesFile:   "k8c-traefik-bootz000.yaml",
+		TraefikVersion:      util.DefaultTraefikVersion,
+		SubnetCidrBlock:     "10.1.32.0/16",
+		SecondaryCidrBlock:  "10.3.32.0/20",
+		MasterIpv4CidrBlock: "10.0.0.0/21",
 	}
 
-	networkConfigUsNorth := model.NetworkConfig{
-		TraefikValuesFile: "k8c-traefik-bootz001.yaml",
-		TraefikVersion:    util.DefaultTraefikVersion,
+	networkConfigEast := model.NetworkConfig{
+		TraefikValuesFile:   "k8c-traefik-bootz001.yaml",
+		TraefikVersion:      util.DefaultTraefikVersion,
+		SubnetCidrBlock:     "10.2.32.0/16",
+		SecondaryCidrBlock:  "10.4.32.0/20",
+		MasterIpv4CidrBlock: "10.0.0.0/21",
+	}
+
+	// Cloud specific
+	cloudConfigUsCentral := model.CloudConfig{
+		Project:     "community-ecosystem",
+		Region:      "us-central1",
+		Locations:   []string{"us-central1-a", "us-central1-b", "us-central1-c"},
+		Environment: "dev",
+		MachineType: "e2-standard-4",
+		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
+		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
+		Bucket:      "google_storage_bucket",
 	}
 
 	cloudConfigUsEast := model.CloudConfig{
 		Project:     "community-ecosystem",
 		Region:      "us-east1",
-		Zones:       []string{"us-east1-b", "us-east1-c", "us-east1-d"},
 		Locations:   []string{"us-east1-b", "us-east1-c", "us-east1-d"},
-		Environment: "e2e",
+		Environment: "dev",
 		MachineType: "e2-standard-4",
 		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
 		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
 		Bucket:      "google_storage_bucket",
 	}
 
-	cloudConfigUsNorth := model.CloudConfig{
-		Project:     "community-ecosystem",
-		Region:      "us-north",
-		Zones:       []string{"us-north1-a", "us-north1-b", "us-north1-c"},
-		Locations:   []string{"us-north1-a", "us-north1-b", "us-north1-c"},
-		Environment: "e2e",
-		MachineType: "e2-standard-4",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-		Bucket:      "google_storage_bucket",
-	}
-
+	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "k8ssandra-ci-us-east",
-		Namespace:     "default",
+		Name:          "rio-c10000",
+		Namespace:     "bootz",
+		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
-		NetworkConfig: networkConfigUsEast,
-		CloudConfig:   cloudConfigUsEast,
+		NetworkConfig: networkConfigCentral,
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "k8ssandra-ci-us-north",
-		Namespace:     "default",
+		Name:          "rio-e10000",
+		Namespace:     "bootz",
+		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},
-		NetworkConfig: networkConfigUsNorth,
-		CloudConfig:   cloudConfigUsNorth,
+		NetworkConfig: networkConfigEast,
 	}
 
 	return map[string]model.ContextConfig{

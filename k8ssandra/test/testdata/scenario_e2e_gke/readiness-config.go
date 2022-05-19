@@ -39,13 +39,13 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 		RemoveAll:       false,
 		Install:         false,
 		ProvisionInfra:  true,
-		PreInstallSetup: true,
+		PreInstallSetup: false,
 	}
 
 	var provisionMeta = model.ProvisionMeta{
 		Enable:            enablement,
-		ProvisionId:       "k8c-Qk9z7G",
-		ArtifactsRootDir:  "/tmp/cloud-k8c-Qk9z7G",
+		ProvisionId:       "k8c-nRfZyJ",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-nRfZyJ",
 		KubeConfigs:       nil,
 		ServiceAccount:    "",
 		DefaultConfigPath: configPath,
@@ -54,10 +54,11 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 	}
 
 	k8cConfig := model.K8cConfig{
-		MedusaSecretName:        "k8ssandra-medusa-key",
+		ClusterName:             "bootz-k8c-cluster",
+		ValuesFilePath:          "k8c-multi-dc.yaml",
+		MedusaSecretName:        "dev-k8ssandra-medusa-key",
 		MedusaSecretFromFileKey: "medusa_gcp_key",
 		MedusaSecretFromFile:    "medusa_gcp_key.json",
-		ValuesFilePath:          "k8c-multi-dc.yaml",
 		ClusterScoped:           false,
 	}
 
