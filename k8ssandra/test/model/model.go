@@ -21,22 +21,31 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type CloudConfig struct {
-	Type        string   `json:"type,omitempty"`
-	Locations   []string `json:"locations,omitempty"`
-	Zones       []string `json:"zones,omitempty"`
-	Region      string   `json:"region,omitempty"`
-	Project     string   `json:"project,omitempty"`
-	Name        string   `json:"name,omitempty"`
-	CredPath    string   `json:"cred_path,omitempty"`
-	CredKey     string   `json:"cred_key,omitempty"`
-	Environment string   `json:"environment,omitempty"`
-	MachineType string   `json:"machine_type,omitempty"`
-	Bucket      string   `json:"bucket,omitempty"`
+type PoolRackConfig struct {
+	Name     string `json:"name,omitempty"`
+	Label    string `json:"label,omitempty"`
+	Location string `json:"location,omitempty"`
 }
+
+type CloudConfig struct {
+	Type            string           `json:"type,omitempty"`
+	Locations       []string         `json:"locations,omitempty"`
+	PoolRackConfigs []PoolRackConfig `json:"poolRackConfigs,omitempty"`
+	Zones           []string         `json:"zones,omitempty"`
+	Region          string           `json:"region,omitempty"`
+	Project         string           `json:"project,omitempty"`
+	Name            string           `json:"name,omitempty"`
+	CredPath        string           `json:"cred_path,omitempty"`
+	CredKey         string           `json:"cred_key,omitempty"`
+	Environment     string           `json:"environment,omitempty"`
+	MachineType     string           `json:"machine_type,omitempty"`
+	Bucket          string           `json:"bucket,omitempty"`
+}
+
 type TFConfig struct {
 	ModuleFolder string `json:"module_folder,omitempty"`
 }
+
 type HelmConfig struct {
 	ChartPath string `json:"chart_path,omitempty"`
 }

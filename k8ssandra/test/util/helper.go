@@ -83,6 +83,8 @@ func CreateTerraformOptions(meta model.ProvisionMeta, config model.ReadinessConf
 	saName := gcp.ConstructCloudClusterName(name, ctx.CloudConfig) + "-" +
 		config.ServiceAccountNameSuffix + defaultIdentityDomain
 
+	nodePools := createNodePools(ctx)
+
 	uniqueBucketName := strings.ToLower(fmt.Sprintf(ctx.CloudConfig.Bucket+"-%s", config.UniqueId))
 	vars := map[string]interface{}{
 		"project_id":              ctx.CloudConfig.Project,
@@ -91,6 +93,7 @@ func CreateTerraformOptions(meta model.ProvisionMeta, config model.ReadinessConf
 		"environment":             ctx.CloudConfig.Environment,
 		"provision_id":            meta.ProvisionId,
 		"region":                  ctx.CloudConfig.Region,
+		"node_pools":              nodePools,
 		"zone":                    ctx.CloudConfig.Region,
 		"node_locations":          ctx.CloudConfig.Locations,
 		"kubectl_config_path":     kubeConfigPath,
@@ -107,6 +110,13 @@ func CreateTerraformOptions(meta model.ProvisionMeta, config model.ReadinessConf
 		ctx.CloudConfig.Bucket:    uniqueBucketName,
 	}
 
+	if meta.Enable.Simulate {
+		println("SIMULATE: tf options output:")
+		for k, v := range vars {
+			println(fmt.Sprintf(" [%s,%s]", k, v))
+		}
+	}
+
 	envVars := map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": ctx.CloudConfig.CredPath,
 		defaultControlPlaneKey: strconv.FormatBool(IsControlPlane(config.Contexts[name]))}
 
@@ -116,6 +126,19 @@ func CreateTerraformOptions(meta model.ProvisionMeta, config model.ReadinessConf
 		EnvVars:      envVars,
 	}
 
+}
+
+func createNodePools(ctx model.ContextConfig) []map[string]interface{} {
+
+	var nodePools []map[string]interface{}
+	for _, prc := range ctx.CloudConfig.PoolRackConfigs {
+		var nodePool = map[string]interface{}{}
+		nodePool["label"] = prc.Label
+		nodePool["name"] = prc.Name
+		nodePool["location"] = prc.Location
+		nodePools = append(nodePools, nodePool)
+	}
+	return nodePools
 }
 
 func IsControlPlane(ctxConfig model.ContextConfig) bool {

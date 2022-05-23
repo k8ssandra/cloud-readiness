@@ -19,8 +19,8 @@ resource "google_container_cluster" "container_cluster" {
   description              = format("%s-gke-cluster", var.name)
   location                 = var.region
   node_locations           = var.node_locations
-  remove_default_node_pool = true
-  initial_node_count       = var.initial_node_count
+  remove_default_node_pool = false
+  // initial_node_count       = var.initial_node_count
   enable_shielded_nodes    = true
 
   # VPC and Sub-network self links. 
@@ -62,48 +62,38 @@ resource "google_container_cluster" "container_cluster" {
     command = format("gcloud container clusters get-credentials %s --region %s --project %s", google_container_cluster.container_cluster.name, google_container_cluster.container_cluster.location, var.project_id)
   }
 
-}
+  dynamic "node_pool" {
+    for_each = var.node_pools
+    content {
+      name       = node_pool.value["name"]
+      node_locations = [node_pool.value["location"]]
+      node_count = var.initial_node_count
 
-# Google container node pool configuration
-resource "google_container_node_pool" "container_node_pool" {
-  name       = format("%s-node-pool", var.name)
-  project    = var.project_id
-  location   = var.region
-  node_locations = var.node_locations
-  cluster    = google_container_cluster.container_cluster.name
-  node_count = var.initial_node_count
+      node_config {
+        machine_type = var.machine_type
+        preemptible  = true
+        tags         = ["http", "ssh"]
 
-  # Node configuration
-  node_config {
-    machine_type = var.machine_type
-    preemptible  = true
-    tags         = ["http", "ssh"]
+        metadata = {
+          disable-legacy-endpoints = "true"
+        }
 
-    metadata = {
-      disable-legacy-endpoints = "true"
+        labels = tomap({ split("=",node_pool.value["label"])[0] : split("=",node_pool.value["label"])[1] })
+        service_account = var.service_account
+
+        oauth_scopes    = [
+          "https://www.googleapis.com/auth/devstorage.read_write",
+          "https://www.googleapis.com/auth/logging.write",
+          "https://www.googleapis.com/auth/monitoring",
+          "https://www.googleapis.com/auth/compute",
+          "https://www.googleapis.com/auth/servicecontrol",
+          "https://www.googleapis.com/auth/service.management.readonly",
+          "https://www.googleapis.com/auth/trace.append",
+          "https://www.googleapis.com/auth/logging.write",
+          "https://www.googleapis.com/auth/monitoring",
+          "https://www.googleapis.com/auth/cloud-platform",
+        ]
+      }
     }
-    labels = {
-    }
-
-    service_account = var.service_account
-    oauth_scopes    = [
-      "https://www.googleapis.com/auth/devstorage.read_write",
-      "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/monitoring",
-      "https://www.googleapis.com/auth/compute",
-      "https://www.googleapis.com/auth/servicecontrol",
-      "https://www.googleapis.com/auth/service.management.readonly",
-      "https://www.googleapis.com/auth/trace.append",
-      "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/monitoring",
-      "https://www.googleapis.com/auth/cloud-platform",
-    ]
   }
-
-  depends_on = [
-    google_container_cluster.container_cluster
-  ]
 }
-
-# TODO : Go program to replace this. 
-# Test the connectivity to GKE cluster that just got created.

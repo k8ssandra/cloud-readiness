@@ -53,30 +53,34 @@ variable "node_locations" {
   type        = list(string)
 }
 
+variable "node_pools" {
+  description = "The node pools."
+  type = list(map(string))
+}
 
 variable "network_link" {
-  description = "network link variable from vpc module outputs"
+  description = "network link variable from vpc module outputs."
   default     = ""
 }
 
 variable "subnetwork_link" {
-  description = "subnetworking link variable from vpc module outputs"
+  description = "subnetworking link variable from vpc module outputs."
   default     = ""
 }
 
 variable "service_account" {
-  description = "The name of the custom service account used for the GKE cluster. This parameter is limited to a maximum of 28 characters"
+  description = "The name of the custom service account used for the GKE cluster. This parameter is limited to a maximum of 28 characters."
   default     = ""
 }
 
 variable "enable_private_endpoint" {
-  description = "(Beta) Whether the master's internal IP address is used as the cluster endpoint"
+  description = "(Beta) Whether the master's internal IP address is used as the cluster endpoint."
   default     = false
   type        = bool
 }
 
 variable "enable_private_nodes" {
-  description = "(Beta) Whether nodes have internal IP addresses only"
+  description = "(Beta) Whether nodes have internal IP addresses only."
   default     = false
   type        = bool
 }
