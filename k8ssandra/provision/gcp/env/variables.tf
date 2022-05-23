@@ -77,16 +77,20 @@ variable "provision_id" {
 }
 
 variable "region" {
-  description = "The region in which to create the VPC network"
+  description = "The region in which to create the VPC network."
   type        = string
 }
 
 variable "node_locations" {
-  description = "The list of node locations"
+  description = "The list of node locations."
   type        = list(string)
   default     = ["us-central1-a"]
 }
 
+variable "node_pools" {
+  description = "The node pools."
+  type        = list(map(string))
+}
 
 variable "project_id" {
   description = "The GCP project in which the components are created."

@@ -172,6 +172,7 @@ func provisionCluster(t *testing.T, name string, tfOptions *terraform.Options,
 			if planErr != nil || applyErr != nil {
 				logger.Log(t, fmt.Sprintf("provision: %s, failure discovered. plan err reported: %s apply "+
 					"err reported: %s", name, planErr, applyErr))
+
 				// TODO indicate to the test client a failure overall, IF we can determine that there is an actual
 				// issue with the TF activities or it was simply a timeout on that side.
 			}

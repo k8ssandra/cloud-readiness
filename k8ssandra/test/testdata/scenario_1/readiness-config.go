@@ -85,7 +85,7 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 		ServiceAccountNameSuffix: "sa",
 
 		// Expected nodes per zone
-		ExpectedNodeCount: 2,
+		ExpectedNodeCount: 1,
 		ProvisionConfig:   provisionConfig,
 	}
 

@@ -13,29 +13,32 @@
 # limitations under the License.
 
 module "vpc" {
-  source       = "../modules/vpc"
-  name         = local.prefix
-  environment  = var.environment
-  region       = var.region
-  project_id   = var.project_id
-  cidr_block = var.cidr_block
+  source               = "../modules/vpc"
+  name                 = local.prefix
+  environment          = var.environment
+  region               = var.region
+  project_id           = var.project_id
+  cidr_block           = var.cidr_block
   secondary_cidr_block = var.secondary_cidr_block
 }
 
+
 module "gke" {
-  source             = "../modules/gke"
-  environment        = var.environment
-  provision_id       = var.provision_id
-  name               = local.prefix
-  region             = var.region
-  node_locations     = var.node_locations
-  project_id         = var.project_id
-  initial_node_count = var.initial_node_count
-  machine_type       = var.machine_type
-  network_link       = module.vpc.network_selflink
-  subnetwork_link    = module.vpc.subnetwork_selflink
-  service_account    = module.iam.service_account
+  source                 = "../modules/gke"
+  environment            = var.environment
+  provision_id           = var.provision_id
+  name                   = local.prefix
+  region                 = var.region
+  node_locations         = var.node_locations
+  project_id             = var.project_id
+  initial_node_count     = var.initial_node_count
+  machine_type           = var.machine_type
+  network_link           = module.vpc.network_selflink
+  subnetwork_link        = module.vpc.subnetwork_selflink
+  service_account        = module.iam.service_account
   master_ipv4_cidr_block = var.master_ipv4_cidr_block
+  node_pools             = var.node_pools
+
 }
 
 module "iam" {

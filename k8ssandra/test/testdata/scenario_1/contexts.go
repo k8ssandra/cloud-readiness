@@ -27,45 +27,83 @@ func Contexts() map[string]model.ContextConfig {
 	networkConfigCentral := model.NetworkConfig{
 		TraefikValuesFile:   "k8c-traefik-bootz000.yaml",
 		TraefikVersion:      util.DefaultTraefikVersion,
-		SubnetCidrBlock:     "10.1.32.0/16",
-		SecondaryCidrBlock:  "10.3.32.0/20",
+		SubnetCidrBlock:     "10.5.32.0/16",
+		SecondaryCidrBlock:  "10.7.32.0/20",
 		MasterIpv4CidrBlock: "10.0.0.0/21",
 	}
 
 	networkConfigEast := model.NetworkConfig{
 		TraefikValuesFile:   "k8c-traefik-bootz001.yaml",
 		TraefikVersion:      util.DefaultTraefikVersion,
-		SubnetCidrBlock:     "10.2.32.0/16",
-		SecondaryCidrBlock:  "10.4.32.0/20",
+		SubnetCidrBlock:     "10.6.32.0/16",
+		SecondaryCidrBlock:  "10.8.32.0/20",
 		MasterIpv4CidrBlock: "10.0.0.0/21",
+	}
+
+	centralRackConfigs := []model.PoolRackConfig{
+		{
+			Name:     "rack1",
+			Label:    "k8ssandra.io/rack=rack1",
+			Location: "us-central1-a",
+		},
+		{
+			Name:     "rack2",
+			Label:    "k8ssandra.io/rack=rack2",
+			Location: "us-central1-b",
+		},
+		{
+			Name:     "rack3",
+			Label:    "k8ssandra.io/rack=rack3",
+			Location: "us-central1-c",
+		},
+	}
+
+	eastRackConfigs := []model.PoolRackConfig{
+		{
+			Name:     "rack1",
+			Label:    "k8ssandra.io/rack=rack1",
+			Location: "us-east1-b",
+		},
+		{
+			Name:     "rack2",
+			Label:    "k8ssandra.io/rack=rack2",
+			Location: "us-east1-c",
+		},
+		{
+			Name:     "rack3",
+			Label:    "k8ssandra.io/rack=rack3",
+			Location: "us-east1-d",
+		},
 	}
 
 	// Cloud specific
 	cloudConfigUsCentral := model.CloudConfig{
-		Project:     "community-ecosystem",
-		Region:      "us-central1",
-		Locations:   []string{"us-central1-a", "us-central1-b", "us-central1-c"},
-		Environment: "dev",
-		MachineType: "e2-standard-4",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-		Bucket:      "google_storage_bucket",
+		Project:         "community-ecosystem",
+		Region:          "us-central1",
+		Locations:       []string{"us-central1-a", "us-central1-b", "us-central1-c"},
+		PoolRackConfigs: centralRackConfigs,
+		Environment:     "dev",
+		MachineType:     "e2-standard-4",
+		CredPath:        "/home/jbanks/.config/gcloud/application_default_credentials.json",
+		CredKey:         "GOOGLE_APPLICATION_CREDENTIALS",
+		Bucket:          "google_storage_bucket",
 	}
 
 	cloudConfigUsEast := model.CloudConfig{
-		Project:     "community-ecosystem",
-		Region:      "us-east1",
-		Locations:   []string{"us-east1-b", "us-east1-c", "us-east1-d"},
-		Environment: "dev",
-		MachineType: "e2-standard-4",
-		CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-		CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-		Bucket:      "google_storage_bucket",
+		Project:         "community-ecosystem",
+		Region:          "us-east1",
+		Locations:       []string{"us-east1-b", "us-east1-c", "us-east1-d"},
+		PoolRackConfigs: eastRackConfigs,
+		Environment:     "dev",
+		MachineType:     "e2-standard-4",
+		CredPath:        "/home/jbanks/.config/gcloud/application_default_credentials.json",
+		CredKey:         "GOOGLE_APPLICATION_CREDENTIALS",
+		Bucket:          "google_storage_bucket",
 	}
 
 	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "rio-c10000",
+		Name:          "rio-c1walle",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
@@ -73,7 +111,7 @@ func Contexts() map[string]model.ContextConfig {
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "rio-e10000",
+		Name:          "rio-e1walle",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},
