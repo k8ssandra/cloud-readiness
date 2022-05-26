@@ -97,7 +97,7 @@ networkConfigEast := model.NetworkConfig{
 
 ```
 
-
+#### Rack to zone model
 After the network definitions, rack to zone assignments are made using the PoolRackConfig structure.  In this case, a rack name is assigned to each location/zone for the cloud region that will be defined in the CloudConfig. 
 
 ```golang
@@ -237,10 +237,7 @@ var enablement = model.EnableConfig {
 }
 ```
 
-
-
 #### Provision metadata model
-
 
 ```golang
 var provisionMeta = model.ProvisionMeta {
@@ -248,14 +245,11 @@ var provisionMeta = model.ProvisionMeta {
   ProvisionId:       "",
   ArtifactsRootDir:  "",
   KubeConfigs:       nil,
-  ServiceAccount:    "",
   DefaultConfigPath: configPath,
   DefaultConfigDir:  configRootDir,
   AdminIdentity:     util.DefaultAdminIdentifier,
 }
 ```
-
-
 
 #### K8ssandra model
 Specific to a K8ssandra installation (not infrastructure provisioning of cloud environment), this model provides installation details needed for the K8ssandra ecosystem.
@@ -315,8 +309,6 @@ return provisionMeta, readinessConfig
 }
 ```
 
-
-
 ### Step 4 - create the test
 
 Create a test .go file, name it anything that helps describe the test.  The only requirement is that it is suffixed with  “_test”
@@ -335,14 +327,11 @@ import (
 )
 ```
 
-
 Inside the test file, create a function beginning with the prefix “Test” name.  In this case, the test is named **TestK8cSmoke**.
-
 
 ```
 func TestK8cSmoke(t *testing.T) { }
 ```
-
 
 Creating the actual test wiring becomes super simple, allowing flexibility for extending the test case with post provisioning verifications.  Again, this can be copied and staged in the appropriate scenario folder to launch your test.
 
@@ -353,11 +342,7 @@ Creating the actual test wiring becomes super simple, allowing flexibility for e
   Apply(t, meta, config)
 ```
 
-
-These two lines provide the following activities:
-
-
-
+The two lines above provide the following activities:
 * Invoke the collection of contexts specific to a scenario.
 * Construct a cloud-readiness model complete with metadata and configurations.
 * Apply the desired activities based on the model and metadata.
@@ -397,7 +382,6 @@ var enablement = model.EnableConfig {
 
 Another alternative is to activate the provisioning and setup in a simulation mode.  This doesn’t apply the actual cloud provisioning, but rather allows the test executor to get log output indicating the model values, configurations, and steps that would be taken.
 
-
 ```golang
 var enablement = model.EnableConfig {
   Simulate:         true,
@@ -408,8 +392,6 @@ var enablement = model.EnableConfig {
 }
 ```
 
-
-
 ## Test execution
 
 Once the readiness model and enablement configurations are defined, a single command like the following will start the provisioning process.
@@ -418,9 +400,6 @@ Once the readiness model and enablement configurations are defined, a single com
 ```golang
 go test -v -timeout 0 -p 3 k8c_smoke_test.go
 ```
-
-
-
 
 * Supply **-v** for verbose output if desired.
 * Supply a **-timeout** of zero to not have a timeout specified on the test run (unless you really want one).
@@ -457,9 +436,6 @@ Note: this is a somewhat manual way to do this at current, but the hooks are in 
 The same approach will apply to infrastructure provisioning clean as to the cleanup of the entire stack of K8ssandra resources.
 
 ## Todos
-
-
-
 1. Version 0.1 baseline branch requires review.
 2. A few open infrastructure and setup issues are remaining for the full e2e integration with k8ssandra testing.  One specific issue recently raised is the request to have a single network provisioned as opposed to scoping by cluster.
 3. Version 0.1 baseline is scoped to the GCP/GKE cloud environment for provisioning and installation of the k8ssandra stack, however, 1..N cluster provisioning exists with initial deployment of the k8ssandra-operator release.
