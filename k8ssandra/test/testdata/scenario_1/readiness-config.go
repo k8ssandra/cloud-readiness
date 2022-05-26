@@ -24,12 +24,6 @@ import (
 	"testing"
 )
 
-/**
-Enable to utilize an existing set of cloud infrastructure artifacts already existing.
-The ProvisionId and ArtifactsRootDir must be supplied with accurate information.
-When not-enabled, will provision fresh cloud infrastructure based on model values.
-*/
-
 func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (model.ProvisionMeta, model.ReadinessConfig) {
 
 	configRootDir, configPath := util.FetchKubeConfigPath(t)
@@ -44,10 +38,9 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 
 	var provisionMeta = model.ProvisionMeta{
 		Enable:            enablement,
-		ProvisionId:       "k8c-nRfZyJ",
-		ArtifactsRootDir:  "/tmp/cloud-k8c-nRfZyJ",
+		ProvisionId:       "k8c-whwimk",
+		ArtifactsRootDir:  "/tmp/cloud-k8c-whwimk",
 		KubeConfigs:       nil,
-		ServiceAccount:    "",
 		DefaultConfigPath: configPath,
 		DefaultConfigDir:  configRootDir,
 		AdminIdentity:     util.DefaultAdminIdentifier,
@@ -85,7 +78,7 @@ func ReadinessConfig(t *testing.T, contexts map[string]model.ContextConfig) (mod
 		ServiceAccountNameSuffix: "sa",
 
 		// Expected nodes per zone
-		ExpectedNodeCount: 1,
+		ExpectedNodeCount: 2,
 		ProvisionConfig:   provisionConfig,
 	}
 

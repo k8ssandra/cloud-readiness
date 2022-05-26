@@ -80,7 +80,7 @@ func Contexts() map[string]model.ContextConfig {
 	cloudConfigUsCentral := model.CloudConfig{
 		Project:         "community-ecosystem",
 		Region:          "us-central1",
-		Locations:       []string{"us-central1-a", "us-central1-b", "us-central1-c"},
+		Locations:       []string{"us-central1-a"},
 		PoolRackConfigs: centralRackConfigs,
 		Environment:     "dev",
 		MachineType:     "e2-standard-4",
@@ -92,7 +92,7 @@ func Contexts() map[string]model.ContextConfig {
 	cloudConfigUsEast := model.CloudConfig{
 		Project:         "community-ecosystem",
 		Region:          "us-east1",
-		Locations:       []string{"us-east1-b", "us-east1-c", "us-east1-d"},
+		Locations:       []string{"us-east1-b"},
 		PoolRackConfigs: eastRackConfigs,
 		Environment:     "dev",
 		MachineType:     "e2-standard-4",
@@ -103,7 +103,7 @@ func Contexts() map[string]model.ContextConfig {
 
 	// Context scoping
 	ctxConfig1 := model.ContextConfig{
-		Name:          "rio-c1walle",
+		Name:          "rio-c1walle100",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsCentral,
 		ClusterLabels: []string{"control-plane", "data-plane"},
@@ -111,7 +111,7 @@ func Contexts() map[string]model.ContextConfig {
 	}
 
 	ctxConfig2 := model.ContextConfig{
-		Name:          "rio-e1walle",
+		Name:          "rio-e1walle100",
 		Namespace:     "bootz",
 		CloudConfig:   cloudConfigUsEast,
 		ClusterLabels: []string{"data-plane"},

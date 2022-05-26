@@ -84,7 +84,6 @@ variable "region" {
 variable "node_locations" {
   description = "The list of node locations."
   type        = list(string)
-  default     = ["us-central1-a"]
 }
 
 variable "node_pools" {
@@ -100,7 +99,6 @@ variable "project_id" {
 variable "zone" {
   description = "The zone in which to create the Kubernetes cluster. Must match the region"
   type        = string
-  default     = "us-central-1a"
 }
 
 variable "k8s_namespace" {

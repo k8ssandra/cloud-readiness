@@ -13,87 +13,86 @@
 # limitations under the License.
 
 # Google container cluster(GKE) configuration
+
+locals {
+  pool_count      = length(var.node_pools)
+  node_pool_names = [for np in toset(var.node_pools) : np.name]
+  node_pools      = zipmap(local.node_pool_names, tolist(toset(var.node_pools)))
+}
+
 resource "google_container_cluster" "container_cluster" {
   name                     = var.name
   project                  = var.project_id
   description              = format("%s-gke-cluster", var.name)
+  initial_node_count       = 1
+  remove_default_node_pool = true
   location                 = var.region
   node_locations           = var.node_locations
-  remove_default_node_pool = false
-  // initial_node_count       = var.initial_node_count
   enable_shielded_nodes    = true
-
-  # VPC and Sub-network self links. 
-  network    = var.network_link
-  subnetwork = var.subnetwork_link
+  network                  = var.network_link
+  subnetwork               = var.subnetwork_link
 
   master_auth {
-    # Setting an empty username and password explicitly disables basic auth
-    # username = ""
-    # password = ""
-
-    # Whether client certificate authorization is enabled for this cluster.
     client_certificate_config {
       issue_client_certificate = false
     }
   }
 
-  # Private Cluster configuration
   private_cluster_config {
     enable_private_endpoint = var.enable_private_endpoint
     enable_private_nodes    = var.enable_private_nodes
   }
 
-  # Resource labels
   resource_labels = {
-    environment = format("%s", var.environment)
+    environment  = format("%s", var.environment)
     provision_id = format("%s", var.provision_id)
   }
 
-  # Creates Internal Load Balancer
   addons_config {
     http_load_balancing {
       disabled = false
     }
   }
 
-  # Provisioner to connect the GKE cluster.
   provisioner "local-exec" {
-    command = format("gcloud container clusters get-credentials %s --region %s --project %s", google_container_cluster.container_cluster.name, google_container_cluster.container_cluster.location, var.project_id)
+    command = format("gcloud container clusters get-credentials %s --region %s --project %s",
+      google_container_cluster.container_cluster.name,
+      google_container_cluster.container_cluster.location, var.project_id
+    )
   }
+}
 
-  dynamic "node_pool" {
-    for_each = var.node_pools
-    content {
-      name       = node_pool.value["name"]
-      node_locations = [node_pool.value["location"]]
-      node_count = var.initial_node_count
+resource "google_container_node_pool" "container_node_pool" {
+  provider   = google
+  project    = var.project_id
+  cluster    = google_container_cluster.container_cluster.name
+  node_count = var.initial_node_count
 
-      node_config {
-        machine_type = var.machine_type
-        preemptible  = true
-        tags         = ["http", "ssh"]
+  for_each       = local.node_pools
+  name           = each.value["name"]
+  location       = var.region
+  node_locations = [each.value["location"]]
 
-        metadata = {
-          disable-legacy-endpoints = "true"
-        }
-
-        labels = tomap({ split("=",node_pool.value["label"])[0] : split("=",node_pool.value["label"])[1] })
-        service_account = var.service_account
-
-        oauth_scopes    = [
-          "https://www.googleapis.com/auth/devstorage.read_write",
-          "https://www.googleapis.com/auth/logging.write",
-          "https://www.googleapis.com/auth/monitoring",
-          "https://www.googleapis.com/auth/compute",
-          "https://www.googleapis.com/auth/servicecontrol",
-          "https://www.googleapis.com/auth/service.management.readonly",
-          "https://www.googleapis.com/auth/trace.append",
-          "https://www.googleapis.com/auth/logging.write",
-          "https://www.googleapis.com/auth/monitoring",
-          "https://www.googleapis.com/auth/cloud-platform",
-        ]
-      }
+  node_config {
+    machine_type = var.machine_type
+    preemptible  = true
+    tags         = ["http", "ssh"]
+    metadata     = {
+      disable-legacy-endpoints = "true"
     }
+    labels = tomap({ split("=", each.value["label"])[0] : split("=", each.value["label"])[1] })
+
+    service_account = var.service_account
+    oauth_scopes    = [
+      "https://www.googleapis.com/auth/devstorage.read_write",
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/servicecontrol",
+      "https://www.googleapis.com/auth/service.management.readonly",
+      "https://www.googleapis.com/auth/trace.append",
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+    ]
   }
 }

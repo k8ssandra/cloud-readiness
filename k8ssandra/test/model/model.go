@@ -127,7 +127,6 @@ type ProvisionMeta struct {
 	Enable            EnableConfig      `json:"enable,omitempty"`
 	ProvisionId       string            `json:"provision_id,omitempty"`
 	KubeConfigs       map[string]string `json:"kube_configs,omitempty"`
-	ServiceAccount    string            `json:"service_account"`
 	ArtifactsRootDir  string            `json:"artifacts_root_dir"`
 	DefaultConfigPath string            `json:"default_config_path"`
 	DefaultConfigDir  string            `json:"default_config_dir"`
