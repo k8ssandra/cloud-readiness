@@ -38,7 +38,6 @@ module "gke" {
   service_account        = module.iam.service_account
   master_ipv4_cidr_block = var.master_ipv4_cidr_block
   node_pools             = var.node_pools
-
 }
 
 module "iam" {

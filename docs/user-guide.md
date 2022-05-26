@@ -98,33 +98,77 @@ networkConfigEast := model.NetworkConfig{
 ```
 
 
-After the network definitions, the cloud specific settings are defined. In this example, there is one for the central region and one for the east region.  Along with the regions there are settings for storage, machine type, and credentials.  These are used to provision the cloud environment.
+After the network definitions, rack to zone assignments are made using the PoolRackConfig structure.  In this case, a rack name is assigned to each location/zone for the cloud region that will be defined in the CloudConfig. 
+
+```golang
+centralRackConfigs := []model.PoolRackConfig{
+  {
+      Name:     "rack1",
+      Label:    "k8ssandra.io/rack=rack1",
+      Location: "us-central1-a",
+  },
+  {
+      Name:     "rack2",
+      Label:    "k8ssandra.io/rack=rack2",
+      Location: "us-central1-b",
+  },
+  {
+      Name:     "rack3",
+      Label:    "k8ssandra.io/rack=rack3",
+      Location: "us-central1-c",
+  },
+}
+
+eastRackConfigs := []model.PoolRackConfig{
+    {
+        Name:     "rack1",
+        Label:    "k8ssandra.io/rack=rack1",
+        Location: "us-east1-b",
+    },
+    {
+        Name:     "rack2",
+        Label:    "k8ssandra.io/rack=rack2",
+        Location: "us-east1-c",
+    },
+    {
+        Name:     "rack3",
+        Label:    "k8ssandra.io/rack=rack3",
+        Location: "us-east1-d",
+    },
+}
+```
+
+
+
+Once the racks are assigned, the cloud specific settings are defined. In this example, there is one for the central region and one for the east region.  Along with the regions there are settings for storage, machine type, and credentials.  These are used to provision the cloud environment.
 
 
 #### Cloud model
-The intent of this model is to specify settings specific to a particular cloud environment for a particular scenario.  This model will support multiple cloud providers in future versions. 
+The intent of this model is to specify settings specific to a particular cloud environment for a defined scenario.  This model will support multiple cloud providers in future versions. 
 
 ```golang
-cloudConfigUsCentral := model.CloudConfig {
-    Project:     "community-ecosystem",
-    Region:      "us-central1",
-    Locations:   []string{"us-central1-a", "us-central1-b", "us-central1-c"},
-    Environment: "dev",
-    MachineType: "e2-standard-4",
-    CredPath:    "/home/jbanks/.config/gcloud/application_default_credentials.json",
-    CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-    Bucket:      "google_storage_bucket",
+cloudConfigUsCentral := model.CloudConfig{
+  Project:         "community-ecosystem",
+  Region:          "us-central1",
+  Locations:       []string{"us-central1-a"},
+  PoolRackConfigs: centralRackConfigs,
+  Environment:     "dev",
+  MachineType:     "e2-standard-4",
+  CredPath:        "<home-dir>.config/gcloud/application_default_credentials.json",
+  CredKey:         "GOOGLE_APPLICATION_CREDENTIALS",
+  Bucket:          "google_storage_bucket",
 }
 
-cloudConfigUsEast := model.CloudConfig {
-    Project:     "community-ecosystem",
-    Region:      "us-east1",
-    Locations:   []string{"us-east1-b", "us-east1-c", "us-east1-d"},
-    Environment: "dev",
-    MachineType: "e2-standard-4",
-    CredPath:    "/home/<yourid>/.config/gcloud/application_default_credentials.json",
-     CredKey:     "GOOGLE_APPLICATION_CREDENTIALS",
-    Bucket:      "google_storage_bucket",
+cloudConfigUsEast := model.CloudConfig{
+  Project:         "community-ecosystem",
+  Region:          "us-east1",
+  Locations:       []string{"us-east1-b"},
+  PoolRackConfigs: eastRackConfigs,
+  Environment:     "dev",
+  MachineType:     "e2-standard-4",
+  CredPath:        "<home-dir>.config/gcloud/application_default_credentials.json",
+  CredKey:         "GOOGLE_APPLICATION_CREDENTIALS",
+  Bucket:          "google_storage_bucket",
 }
 ```
 
